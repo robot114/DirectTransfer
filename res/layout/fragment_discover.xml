@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:paddingLeft="@dimen/defaultMargin"
+    android:paddingRight="@dimen/defaultMargin" >
+
+    <ExpandableListView
+        android:id="@+id/listViewPeers"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_margin="@dimen/defaultMargin"
+        android:layout_weight="1"
+        android:divider="@android:color/darker_gray"
+        android:dividerHeight="0.5dp"
+        android:indicatorLeft="?android:attr/expandableListPreferredItemIndicatorLeft" >
+
+    </ExpandableListView>
+
+    <TextView
+        android:id="@+id/textViewHint"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:layout_margin="@dimen/defaultMargin"
+        android:background="@drawable/back_border"
+        android:padding="@dimen/defaultPadding"
+        android:text="@string/hintStartDiscovering"
+        android:textAppearance="?android:attr/textAppearanceMedium" />
+
+</LinearLayout>

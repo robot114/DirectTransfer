@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<attr name="colorPeerNotAdded" format="reference|color" />
+	<attr name="colorPeerUnavailad" format="reference|color" />
+	<attr name="colorPeerAvailad" format="reference|color" />
+	<attr name="colorPeerConnected" format="reference|color" />
+	<attr name="colorPeerInvited" format="reference|color" />
+	<attr name="colorPeerFailed" format="reference|color" />
+</resources>

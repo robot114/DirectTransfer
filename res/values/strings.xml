@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="app_name">DirectTransfer</string>
+    <string name="navigation_drawer_open">Open navigation drawer</string>
+    <string name="navigation_drawer_close">Close navigation drawer</string>
+    <string name="action_example">Example action</string>
+    <string name="action_settings">Settings</string>
+    <string name="buttonTextRefresh">Refresh Peers</string>
+    <string name="buttonTextAddPeers">Add Selected</string>
+    <string name="labelDirectory">Directory: </string>
+    <string name="labelTarget">Target: </string>
+    <string name="titleTransfer">Transfer</string>
+    <string name="titleDiscover">Discover Peers</string>
+    <string name="titleDialogEnterPeerName">Enter Peer\'s Name</string><string name="titleDialogRemoveFromPersistence">Remove</string>
+    <string name="promptEnableWifi">WiFi is going to be enabled. Are you sure?</string>
+    <string name="promptDenyToEnableWifiOfDiscoverPeer">Permission to enable wifi is denied, cannot discover peers!</string>
+    <string name="promptFailedToEnableWifiOfDiscoverPeer">Failed to enable wifi. Please enable wifi manually first!</string>
+    <string name="promptFailedToDiscoverPeer">Failed to discover peers! The reason is \'%1$s\'.</string>
+    <string name="promptFailedToDiscoverPeerReasonUnsupport">wifi direct is not supported</string>
+    <string name="promptFailedToDiscoverPeerReasonError">unknown error</string>
+    <string name="promptFailedToDiscoverPeerReasonBusy">system is busy</string>
+    <string name="goBack">Go Back</string>
+    <string name="hintStartDiscovering">Discover started. Make the peer to start discovering too, please.</string>
+    <string name="hintStopDiscovering">Discover stopped.</string>
+    <string name="hintSelectPeerToTransfer">Select an available device to start transfering</string>
+    <string name="peerDataAddress">Address: </string>
+    <string name="peerDataStatus">Status: </string>
+    <string name="peerStatusConntected">Connected</string>
+    <string name="peerStatusInvited">Invited</string>
+    <string name="peerStatusFailed">Failed</string>
+    <string name="peerStatusAvailable">Available</string>
+    <string name="peerStatusUnavailable">Unavailable</string>
+    <string name="unknown">Unknown</string>
+    <string name="menuItemRenamePeer">Rename</string>
+    <string name="menuItemRemovePeer">Remove</string>
+    
+    <string name="promptRemovePeerFromPersistence">Are you sure to remove this peer from history list?</string>
+    
+</resources>

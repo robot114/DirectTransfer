@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<style name="PeerAppearance.NotAdded" parent="@android:style/TextAppearance.Medium">
+	    <item name="android:textColor">?attr/colorPeerNotAdded</item>
+	</style>    
+
+	<style name="PeerAppearance.Unavailad" parent="@android:style/TextAppearance.Medium">
+	    <item name="android:textColor">?attr/colorPeerUnavailad</item>
+	</style>    
+
+	<style name="PeerAppearance.Availad" parent="@android:style/TextAppearance.Medium">
+	    <item name="android:textColor">?attr/colorPeerAvailad</item>
+	</style>    
+
+	<style name="PeerAppearance.Connected" parent="@android:style/TextAppearance.Medium">
+	    <item name="android:textColor">?attr/colorPeerConnected</item>
+	    <item name="android:textStyle">bold</item>
+	</style>    
+
+	<style name="PeerAppearance.Invited" parent="@android:style/TextAppearance.Medium">
+	    <item name="android:textColor">?attr/colorPeerInvited</item>
+	</style>    
+
+	<style name="PeerAppearance.Failed" parent="@android:style/TextAppearance.Medium">
+	    <item name="android:textColor">?attr/colorPeerFailed</item>
+	</style>
+</resources>
