@@ -1,12 +1,21 @@
 package com.zsm.directTransfer.ui;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Observable;
+import java.util.Observer;
 
+import android.annotation.SuppressLint;
 import android.app.AlertDialog;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.res.Resources;
 import android.net.wifi.p2p.WifiP2pDevice;
+import android.net.wifi.p2p.WifiP2pDeviceList;
+import android.net.wifi.p2p.WifiP2pManager;
 import android.view.LayoutInflater;
 import android.view.MenuInflater;
 import android.view.MenuItem;
@@ -21,16 +30,25 @@ import android.widget.ImageView;
 import android.widget.PopupMenu;
 import android.widget.PopupMenu.OnMenuItemClickListener;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.zsm.directTransfer.R;
 import com.zsm.directTransfer.data.WifiP2pPeer;
 import com.zsm.directTransfer.preferences.PeerListOperator;
 
+@SuppressLint("InflateParams")
 public class PeerExpandableAdapter extends BaseExpandableListAdapter {
-
+	
+	private class PeerObservable extends Observable {
+		@Override
+		public synchronized void setChanged() {
+			super.setChanged();
+		}
+	}
+	
 	private final static Object TAG_NAME = new Object();
 	private final static Object TAG_DESCRIPTION = new Object();
-	private static final Object TAG_REMOVE = new Object();
+	private final static Object TAG_REMOVE = new Object();
 	
 	protected static final int TAG_PEER = R.id.TAG_ID_PEER;
 	
@@ -38,12 +56,22 @@ public class PeerExpandableAdapter extends BaseExpandableListAdapter {
 	private final static int CHILD_POS_STATUS = 1;
 	private final static int CHILD_LAST = 2;
 	
+	private PeerStateBroadcastReceiver mPeerStateReceiver;
+
 	private ArrayList<WifiP2pPeer> mPeerList;
 	private Context mContext;
 	private PeerListOperator mPeerListOperator;
 	private OnClickListener mNameClickListener;
 	private OnClickListener mRemoveClickListener;
 	private OnLongClickListener mNameLongClickListener;
+	private IntentFilter mIntentFilter;
+	private int mAvailablePeersCount;
+	// Observable used to notify the observers that the peer list changed.
+	// More than one observer can be added
+	private PeerObservable mPeerListObservable = new PeerObservable();
+	// Observable used to notify the observer that a peer is selected.
+	// Only one observer will be registered
+	private PeerObservable mPeerSelectionObservable = new PeerObservable();
 
 	PeerExpandableAdapter( Context context, PeerListOperator o ) {
 		mContext = context;
@@ -72,7 +100,7 @@ public class PeerExpandableAdapter extends BaseExpandableListAdapter {
 			public void onClick(View v) {
 				WifiP2pPeer wifiP2pPeer = (WifiP2pPeer) v.getTag( TAG_PEER );
 				if( wifiP2pPeer.isPersistened() ) {
-					// TODO
+					onSelectPeer( wifiP2pPeer );
 				} else {
 					addPeerOrRename( wifiP2pPeer );
 				}
@@ -277,6 +305,7 @@ public class PeerExpandableAdapter extends BaseExpandableListAdapter {
 					}
 					wifiP2pPeer.setPersistened(true);
 					notifyDataSetChanged();
+					onSelectPeer( wifiP2pPeer );
 				}
 			})
 			.setNegativeButton(android.R.string.cancel, null)
@@ -297,10 +326,7 @@ public class PeerExpandableAdapter extends BaseExpandableListAdapter {
 					
 					mPeerListOperator.deletePeer(wifiP2pPeer);
 					wifiP2pPeer.setPersistened(false);
-					int status = wifiP2pPeer.getStatus();
-					if( status != WifiP2pDevice.AVAILABLE
-						&& status != WifiP2pDevice.CONNECTED
-						&& status != WifiP2pDevice.INVITED ) {
+					if( !isPeerAvailable(wifiP2pPeer) ) {
 						
 						mPeerList.remove(wifiP2pPeer);
 					}
@@ -381,4 +407,80 @@ public class PeerExpandableAdapter extends BaseExpandableListAdapter {
 		return false;
 	}
 
+	private class PeerStateBroadcastReceiver extends BroadcastReceiver {
+
+		@Override
+		public void onReceive(Context context, Intent intent) {
+			WifiP2pDeviceList list
+				= intent.getParcelableExtra( WifiP2pManager.EXTRA_P2P_DEVICE_LIST );
+			if( WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION.equals(intent.getAction())
+				&& list != null	) {
+				
+				Collection<WifiP2pDevice> deviceList = list.getDeviceList();
+				clearPeersNotPersisitened();
+				for( WifiP2pDevice device : deviceList ) {
+					peerDiscovered( new WifiP2pPeer( device ) );
+				}
+				mAvailablePeersCount = deviceList.size();
+				notifyDataSetChanged();
+			}
+		}
+		
+	}
+	
+	int getAvailablePeersCount() {
+		return mAvailablePeersCount;
+	}
+
+	void registerPeerStateBroadcastReceiver() {
+		if( mPeerStateReceiver == null ) {
+		    mPeerStateReceiver = new PeerStateBroadcastReceiver();
+		    mIntentFilter
+	    		= new IntentFilter( WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION );
+			mContext.registerReceiver(mPeerStateReceiver, mIntentFilter );
+		}
+	}
+
+	public void unregisterPeerStateBroadcastReceiver() {
+		if( mPeerStateReceiver != null ) {
+			mContext.unregisterReceiver(mPeerStateReceiver);
+			mPeerStateReceiver = null;
+		}
+	}
+
+	public void addPeerListObserver( Observer o ) {
+		mPeerListObservable.addObserver(o);
+	}
+	
+	public void registerPeerSelectionObserver(Observer observer) {
+		mPeerSelectionObservable.deleteObservers();
+		mPeerSelectionObservable.addObserver( observer );
+	}
+
+	@Override
+	public void notifyDataSetChanged() {
+		super.notifyDataSetChanged();
+		// Notify the observer of notifier too
+		mPeerListObservable.setChanged();
+		mPeerListObservable.notifyObservers(mPeerList);
+	}
+	
+	private void onSelectPeer( WifiP2pPeer peer ) {
+		if( isPeerAvailable( peer ) ) {
+			mPeerSelectionObservable.setChanged();
+			mPeerSelectionObservable.notifyObservers(peer);
+		} else {
+			String str
+				= mContext.getString( R.string.promptPeerUnavailable,
+									  peer.getShowName() );
+			Toast.makeText(mContext, str, Toast.LENGTH_SHORT).show();
+		}
+	}
+
+	private boolean isPeerAvailable(WifiP2pPeer peer) {
+		int status = peer.getStatus();
+		return status == WifiP2pDevice.AVAILABLE
+			|| status == WifiP2pDevice.CONNECTED
+			|| status == WifiP2pDevice.INVITED;
+	}
 }

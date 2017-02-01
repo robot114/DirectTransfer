@@ -1,82 +1,111 @@
 package com.zsm.directTransfer.ui;
 
+import java.util.Observable;
+import java.util.Observer;
+
 import android.app.ActionBar;
 import android.app.Activity;
 import android.app.Fragment;
 import android.app.FragmentManager;
 import android.os.Bundle;
 import android.support.v4.widget.DrawerLayout;
-import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
-import android.view.View;
-import android.view.ViewGroup;
 
 import com.zsm.directTransfer.R;
+import com.zsm.directTransfer.data.WifiP2pPeer;
 
 public class MainActivity extends Activity implements
 		NavigationDrawerFragment.NavigationDrawerCallbacks {
 
+	final static int FRAGMENT_FILE_POSITION = MainDrawerAdapter.END_OF_POSITION;
 	/**
 	 * Fragment managing the behaviors, interactions and presentation of the
 	 * navigation drawer.
 	 */
 	private NavigationDrawerFragment mNavigationDrawerFragment;
 
+	private StatusBarFragment mStatusBarFragment;
+	
 	/**
 	 * Used to store the last screen title. For use in
 	 * {@link #restoreActionBar()}.
 	 */
 	private CharSequence mTitle;
+	
+	private Observer mPeerSelectionObserver;
 
-	private Fragment[] mFragment = new Fragment[MainDrawerAdapter.END_OF_POSITION];
+	private Fragment[] mFragment = new Fragment[FRAGMENT_FILE_POSITION+1];
 
-	public MainActivity() {
-		super();
-		mFragment[MainDrawerAdapter.TRANSFER_ITEM_POSITION] = new TransferFragment();
-		mFragment[MainDrawerAdapter.NEW_PEER_ITEM_POSITION] = new DiscoverPeerFragment();
+	static final private int[] TITLE_RES_ID
+		= new int[]{ R.string.titleTransfer, R.string.titleDiscover,
+					 R.string.titleFile };
+
+	private void intiFragments() {
+		
+		mStatusBarFragment = new StatusBarFragment( this );
+		
+		mFragment[MainDrawerAdapter.TRANSFER_ITEM_POSITION]
+				= new TransferFragment( this, mStatusBarFragment );
+		
+		PeerFragment fp = new PeerFragment( this, mStatusBarFragment );
+		mPeerSelectionObserver = new Observer() {
+			@Override
+			public void update(Observable o, Object arg) {
+				WifiP2pPeer peer = (WifiP2pPeer)arg;
+				onPeerSelected(peer);
+			}
+		};
+		mFragment[MainDrawerAdapter.PEER_ITEM_POSITION] = fp;
+		fp.registerPeerSelectionObserver(mPeerSelectionObserver);
+		
+		FileFragment ff = new FileFragment(this);
+		mFragment[FRAGMENT_FILE_POSITION] = ff;
 	}
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
+		
+		intiFragments();
 		setContentView(R.layout.main);
 
-		mNavigationDrawerFragment = (NavigationDrawerFragment) getFragmentManager()
+		FragmentManager fragmentManager = getFragmentManager();
+		fragmentManager
+				.beginTransaction()
+				.replace(R.id.statusBarContainer, mStatusBarFragment )
+				.commit();
+		
+		mNavigationDrawerFragment
+			= (NavigationDrawerFragment) getFragmentManager()
 				.findFragmentById(R.id.navigation_drawer);
+		
 		mTitle = getTitle();
 
 		// Set up the drawer.
 		mNavigationDrawerFragment.setUp(R.id.navigation_drawer,
 				(DrawerLayout) findViewById(R.id.drawer_layout));
-		
 	}
 
 	@Override
 	public void onNavigationDrawerItemSelected(int position) {
+		toFragment(position);
+	}
+
+	private void toFragment(int position) {
+		mStatusBarFragment.clearStatus( );
 		// update the main content by replacing fragments
-		FragmentManager fragmentManager = getFragmentManager();
-		Fragment newFragment = null;
-		if( position >= 0 && position < MainDrawerAdapter.END_OF_POSITION ) {
+		Fragment newFragment = mFragment[0];
+		if( position >= 0 && position <= FRAGMENT_FILE_POSITION ) {
 			newFragment = mFragment[position];
-		} else {
-			newFragment = PlaceholderFragment.newInstance(position + 1);
 		}
+		FragmentManager fragmentManager = getFragmentManager();
 		fragmentManager
 				.beginTransaction()
 				.replace(R.id.container, newFragment )
 				.commit();
-	}
-
-	public void onSectionAttached(int number) {
-		switch (number) {
-		case 1:
-			mTitle = getString(R.string.titleTransfer);
-			break;
-		case 2:
-			mTitle = getString(R.string.titleDiscover);
-			break;
-		}
+		
+		mTitle = getString(TITLE_RES_ID[position]);
 	}
 
 	public void restoreActionBar() {
@@ -111,44 +140,8 @@ public class MainActivity extends Activity implements
 		return super.onOptionsItemSelected(item);
 	}
 
-	/**
-	 * A placeholder fragment containing a simple view.
-	 */
-	public static class PlaceholderFragment extends Fragment {
-		/**
-		 * The fragment argument representing the section number for this
-		 * fragment.
-		 */
-		private static final String ARG_SECTION_NUMBER = "section_number";
-
-		/**
-		 * Returns a new instance of this fragment for the given section number.
-		 */
-		public static PlaceholderFragment newInstance(int sectionNumber) {
-			PlaceholderFragment fragment = new PlaceholderFragment();
-			Bundle args = new Bundle();
-			args.putInt(ARG_SECTION_NUMBER, sectionNumber);
-			fragment.setArguments(args);
-			return fragment;
-		}
-
-		public PlaceholderFragment() {
-		}
-
-		@Override
-		public View onCreateView(LayoutInflater inflater, ViewGroup container,
-				Bundle savedInstanceState) {
-			View rootView = inflater.inflate(R.layout.fragment_transfer, container,
-					false);
-			return rootView;
-		}
-
-		@Override
-		public void onAttach(Activity activity) {
-			super.onAttach(activity);
-			((MainActivity) activity).onSectionAttached(getArguments().getInt(
-					ARG_SECTION_NUMBER));
-		}
+	private void onPeerSelected( WifiP2pPeer peer ) {
+		toFragment(FRAGMENT_FILE_POSITION);
 	}
-
+	
 }

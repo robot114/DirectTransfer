@@ -15,6 +15,8 @@ public class Preferences {
 
 	private static final int PREFRENCES_VERSION = 1;
 
+	private static final String KEY_READ_PATH = "KEY_READ_PATH";
+	
 	static private Preferences instance;
 	final private SharedPreferences preferences;
 	
@@ -90,5 +92,13 @@ public class Preferences {
 	
 	public PeerListOperator getPeerListOperator() {
 		return mPeerListOperator;
+	}
+
+	public String getReadPath() {
+		return preferences.getString( KEY_READ_PATH, null );
+	}
+
+	public void setReadPath(String absolutePath) {
+		preferences.edit().putString(KEY_READ_PATH, absolutePath).commit();
 	}
 }

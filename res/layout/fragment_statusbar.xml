@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/statusBarLayout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:alpha="0.7"
+    android:background="?attr/colorStatusBarWarning"
+    android:orientation="vertical" >
+
+    <TextView
+        android:id="@+id/textViewStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="@dimen/defaultMargin"
+        android:lines="2"
+        android:maxLines="2"
+        android:text="@string/hintStartDiscovering"
+        android:textAppearance="?android:attr/textAppearanceMedium" />
+
+</LinearLayout>

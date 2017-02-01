@@ -22,6 +22,9 @@
         <item name="colorPeerInvited">@color/Yellow</item>
         <item name="colorPeerFailed">@color/Red</item>
         
+        <item name="colorStatusBarNormal">@color/PaleGreen</item>
+        <item name="colorStatusBarWarning">@color/Red</item>
+        <item name="colorStatusBarText">@color/Black</item>
     </style>
 
 </resources>

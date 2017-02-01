@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:android="http://schemas.android.com/apk/res/android">
+    <style name="StautsAppearance.Normal.Text" parent="@android:style/TextAppearance.Medium">
+	    <item name="android:textColor">?attr/colorStatusBarText</item>
+	</style>    
+
+	<style name="StautsAppearance.Warning.Text" parent="@android:style/TextAppearance.Medium">
+	    <item name="android:textColor">?attr/colorStatusBarText</item>
+	    <item name="android:textStyle">bold</item>
+	</style>
+</resources>

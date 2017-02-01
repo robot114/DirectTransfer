@@ -10,8 +10,11 @@
     <string name="buttonTextAddPeers">Add Selected</string>
     <string name="labelDirectory">Directory: </string>
     <string name="labelTarget">Target: </string>
+    <string name="labelSize">Size: </string>
+    <string name="labelLastModified">Modified: </string>
     <string name="titleTransfer">Transfer</string>
     <string name="titleDiscover">Discover Peers</string>
+    <string name="titleFile">Select Files to Transfer</string>
     <string name="titleDialogEnterPeerName">Enter Peer\'s Name</string><string name="titleDialogRemoveFromPersistence">Remove</string>
     <string name="promptEnableWifi">WiFi is going to be enabled. Are you sure?</string>
     <string name="promptDenyToEnableWifiOfDiscoverPeer">Permission to enable wifi is denied, cannot discover peers!</string>
@@ -20,10 +23,13 @@
     <string name="promptFailedToDiscoverPeerReasonUnsupport">wifi direct is not supported</string>
     <string name="promptFailedToDiscoverPeerReasonError">unknown error</string>
     <string name="promptFailedToDiscoverPeerReasonBusy">system is busy</string>
+    <string name="promptPeerUnavailable">Peer \'%1$s\' is not available. Open the peer wifi direct, please.</string>
+    <string name="promptPermissReadStorage">External storage is access denied. Grant the permission first.</string>
+    <string name="promptClearFileList">All the files will be removed from this list. Are you sure?</string>
     <string name="goBack">Go Back</string>
     <string name="hintStartDiscovering">Discover started. Make the peer to start discovering too, please.</string>
     <string name="hintStopDiscovering">Discover stopped.</string>
-    <string name="hintSelectPeerToTransfer">Select an available device to start transfering</string>
+    <string name="hintSelectPeerToTransfer">Select an available device to start transferring</string>
     <string name="peerDataAddress">Address: </string>
     <string name="peerDataStatus">Status: </string>
     <string name="peerStatusConntected">Connected</string>
@@ -34,7 +40,10 @@
     <string name="unknown">Unknown</string>
     <string name="menuItemRenamePeer">Rename</string>
     <string name="menuItemRemovePeer">Remove</string>
-    
     <string name="promptRemovePeerFromPersistence">Are you sure to remove this peer from history list?</string>
+    <string name="menuAddFiles">Add Files</string>
+    <string name="menuClearFileList">Clear File List</string>
+    <string name="menuSelectAll">Select All</string>
+    <string name="menuFileSearchFolder">Search Folder</string>
     
 </resources>

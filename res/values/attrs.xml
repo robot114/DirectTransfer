@@ -6,4 +6,8 @@
 	<attr name="colorPeerConnected" format="reference|color" />
 	<attr name="colorPeerInvited" format="reference|color" />
 	<attr name="colorPeerFailed" format="reference|color" />
+
+	<attr name="colorStatusBarNormal" format="reference|color" />
+	<attr name="colorStatusBarWarning" format="reference|color" />
+	<attr name="colorStatusBarText" format="reference|color" />
 </resources>

@@ -1,16 +1,12 @@
 package com.zsm.directTransfer.ui;
 
-import java.util.Collection;
+import java.util.ArrayList;
+import java.util.Observable;
+import java.util.Observer;
 
-import android.app.Activity;
 import android.app.Fragment;
-import android.content.BroadcastReceiver;
 import android.content.Context;
-import android.content.Intent;
-import android.content.IntentFilter;
 import android.net.wifi.WifiManager;
-import android.net.wifi.p2p.WifiP2pDevice;
-import android.net.wifi.p2p.WifiP2pDeviceList;
 import android.net.wifi.p2p.WifiP2pManager;
 import android.net.wifi.p2p.WifiP2pManager.Channel;
 import android.os.Bundle;
@@ -22,43 +18,52 @@ import android.view.MenuItem.OnMenuItemClickListener;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ExpandableListView;
-import android.widget.TextView;
 
-import com.zsm.android.ui.Utility;
 import com.zsm.android.wifi.WifiUtility;
 import com.zsm.android.wifi.WifiUtility.EnableResultListener;
 import com.zsm.directTransfer.R;
-import com.zsm.directTransfer.data.FakeWifiP2pPeer;
-import com.zsm.directTransfer.data.WifiP2pPeer;
 import com.zsm.directTransfer.preferences.Preferences;
 import com.zsm.log.Log;
 
-public class DiscoverPeerFragment extends Fragment {
+public class PeerFragment extends Fragment {
 
+	private Context mContext;
+	private StatusBarOperator mStatusBarOperator;
+	
 	private WifiP2pManager mManager;
 	private Channel mChannel;
 	private ExpandableListView mPeersListView;
-	private PeerStateBroadcastReceiver mPeerStateReceiver;
-	private IntentFilter mIntentFilter;
 	private PeerExpandableAdapter mListAdapter;
-	private TextView mHintView;
-	private String mHintText;
-	private int mHintDrawableId;
 	private boolean mIsDiscovering;
+	
+	private Observer mPeerListObserver;
+
+	public PeerFragment(Context context, StatusBarOperator statusOperator) {
+		mContext = context;
+		mStatusBarOperator = statusOperator;
+		
+	    // Initialize List adapter here to avoid NullPointerException when 
+	    // registerPeerSelectionObserver and addPeerListObserver(Observer)
+	    // are invoked.
+		mListAdapter
+			= new PeerExpandableAdapter( mContext,
+							Preferences.getInstance().getPeerListOperator() );
+		
+		mListAdapter.registerPeerStateBroadcastReceiver();
+		addPeerListObserver();
+	}
 
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		
-		Context context = getActivity();
-	    mManager = (WifiP2pManager) context.getSystemService(Context.WIFI_P2P_SERVICE);
-	    mChannel = mManager.initialize(context, context.getMainLooper(), null);
+	    mManager
+	    	= (WifiP2pManager) mContext.getSystemService(
+	    			Context.WIFI_P2P_SERVICE);
+	    
+	    mChannel = mManager.initialize(mContext, mContext.getMainLooper(), null);
 
 	    mIsDiscovering = false;
-	    mPeerStateReceiver = new PeerStateBroadcastReceiver();
-	    mIntentFilter
-	    	= new IntentFilter( WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION );
-	    getActivity().registerReceiver(mPeerStateReceiver, mIntentFilter);
 	    
 	    checkWifiAndStartToDiscover( );
 	    
@@ -90,14 +95,13 @@ public class DiscoverPeerFragment extends Fragment {
 						break;
 					}
 					
-					mHintDrawableId = R.drawable.back_border_error;
-					setHint(hintResId, mHintDrawableId);
+					setHint(hintResId, StatusBarOperator.STATUS_WARNING);
 					
 					Log.w( "Fail to enable wifi. Reason code", reason );
 				}
 			};
 				
-			WifiUtility.getInstance().enableWifi( getActivity(), listener);
+			WifiUtility.getInstance().enableWifi( mContext, listener);
 		}
 	}
 	
@@ -108,27 +112,15 @@ public class DiscoverPeerFragment extends Fragment {
 		View view = inflater.inflate( R.layout.fragment_discover, (ViewGroup)null );
 		
 		mPeersListView = (ExpandableListView)view.findViewById( R.id.listViewPeers );
-		mListAdapter
-			= new PeerExpandableAdapter( getActivity(),
-							Preferences.getInstance().getPeerListOperator() );
-		
+	    
 		mPeersListView.setAdapter(mListAdapter);
-		mHintView = (TextView)view.findViewById( R.id.textViewHint );
-		
-		fixHintHeight();
 		
 		return view;
 	}
 
-	private void fixHintHeight() {
-		int hintViewHeight = Utility.getTextViewHeight(mHintView);
-		mHintView.setMinHeight( hintViewHeight );
-		mHintView.setMaxHeight( hintViewHeight );
-	}
-
 	private boolean isWifiEnabled() {
 		WifiManager wifi
-			= (WifiManager)getActivity().getSystemService(Context.WIFI_SERVICE);
+			= (WifiManager)mContext.getSystemService(Context.WIFI_SERVICE);
 		return wifi.isWifiEnabled();
 	}
 	
@@ -154,38 +146,43 @@ public class DiscoverPeerFragment extends Fragment {
 	@Override
 	public void onDetach() {
 		super.onDetach();
-		WifiUtility.getInstance().unregisterWifiEnableReceiver( getActivity() );
-		if( mPeerStateReceiver != null ) {
-			getActivity().unregisterReceiver(mPeerStateReceiver);
-			mPeerStateReceiver = null;
-		}
-		
+		WifiUtility.getInstance().unregisterWifiEnableReceiver( mContext );
+		mListAdapter.unregisterPeerStateBroadcastReceiver();
 		if( mIsDiscovering ) {
 			mManager.stopPeerDiscovery(mChannel, new DiscoverListener( false ) );
 			mIsDiscovering = false;
 		}
 	}
 
-	private void setHint( ) {
-		if( mHintView != null ) {
-			mHintView.setText( mHintText );
-			mHintView.setBackgroundResource( mHintDrawableId );
-		}
-	}
-	
-	private void setHint(int textResId, int backgroundResId) {
-		Activity activity = getActivity();
-		if( activity != null ) {
-			mHintText = activity.getResources().getString(textResId);
-			mHintDrawableId = backgroundResId;
-			setHint( );
-		}
+	private void setHint(int textResId, int status) {
+		mStatusBarOperator.setStatus(textResId, status);
 	}
 
-	private void setHint( String text, int backgroundResId ) {
-		mHintText = text;
-		mHintDrawableId = backgroundResId;
-		setHint( );
+	private void setHint( String text, int status ) {
+		mStatusBarOperator.setStatus(text, status);
+	}
+	
+	private void addPeerListObserver() {
+		mPeerListObserver = new Observer() {
+			@Override
+			public void update(Observable o, Object arg) {
+				ArrayList<?> list = (ArrayList<?>)arg;
+				setHint( list.size() == 0 
+							? R.string.hintStartDiscovering 
+							: R.string.hintSelectPeerToTransfer,
+						 StatusBarOperator.STATUS_NORMAL );
+			}
+		};
+		
+		addPeerListObserver(mPeerListObserver);
+	}
+	
+	void addPeerListObserver( Observer o ) {
+		mListAdapter.addPeerListObserver(o);
+	}
+	
+	public void registerPeerSelectionObserver( Observer o ) {
+		mListAdapter.registerPeerSelectionObserver(o);
 	}
 	
 	private class DiscoverListener implements WifiP2pManager.ActionListener {
@@ -208,18 +205,13 @@ public class DiscoverPeerFragment extends Fragment {
 				hintResId = R.string.hintStopDiscovering;
 			}
 			
-			setHint( hintResId, R.drawable.back_border );
+			setHint( hintResId, StatusBarOperator.STATUS_NORMAL );
 		}
 
 		@Override
 		public void onFailure(int reason) {
 			Log.w( "Discover peers failed. Reason is", reason, "action is start: ", mStart );
 
-			Activity activity = getActivity();
-			if( activity == null ) {
-				return;
-			}
-			
 			int reasonId;
 			switch( reason ) {
 				case WifiP2pManager.P2P_UNSUPPORTED:
@@ -233,42 +225,15 @@ public class DiscoverPeerFragment extends Fragment {
 					break;
 			}
 			
-			String reasonStr = activity.getString( reasonId );
+			String reasonStr = mContext.getString( reasonId );
 			String text
-				= activity.getString( R.string.promptFailedToDiscoverPeer,
-									  reasonStr );
+				= mContext.getString( R.string.promptFailedToDiscoverPeer,
+									   reasonStr );
 			
-			setHint( text, R.drawable.back_border_error );
+			setHint( text, StatusBarOperator.STATUS_WARNING );
 			mIsDiscovering = false;
 		}
 		
 	}
-	
-	private class PeerStateBroadcastReceiver extends BroadcastReceiver {
 
-		@Override
-		public void onReceive(Context context, Intent intent) {
-			WifiP2pDeviceList list
-				= intent.getParcelableExtra( WifiP2pManager.EXTRA_P2P_DEVICE_LIST );
-			if( WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION.equals(intent.getAction())
-				&& list != null	) {
-				
-				Collection<WifiP2pDevice> deviceList = list.getDeviceList();
-				mListAdapter.clearPeersNotPersisitened();
-				for( WifiP2pDevice device : deviceList ) {
-					mListAdapter.peerDiscovered( new WifiP2pPeer( device ) );
-				}
-				
-				for( int i = 0; i < 20; i++ ) {
-					mListAdapter.peerDiscovered( new FakeWifiP2pPeer( ""+i ) );
-				}
-				mListAdapter.notifyDataSetChanged();
-				setHint( deviceList.size() == 0 
-							? R.string.hintStartDiscovering 
-							: R.string.hintSelectPeerToTransfer,
-				R.drawable.back_border );
-			}
-		}
-		
-	}
 }

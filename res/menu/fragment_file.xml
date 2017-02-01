@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android" >
+    <item android:id="@+id/itemAddFile"
+          android:title="@string/menuAddFiles"
+          android:icon="@drawable/file_list_add"
+          android:showAsAction="always">
+    </item>
+    <item android:id="@+id/itemSearchFolder" android:title="@string/menuFileSearchFolder" android:icon="@drawable/file_list_search_folder" android:showAsAction="always"></item><item android:id="@+id/itemClearList"
+          android:title="@string/menuClearFileList"
+          android:icon="@drawable/file_list_clear"
+          android:showAsAction="always">
+    </item>
+    <item android:id="@+id/itemSelectAll"
+          android:checkable="true"
+          android:showAsAction="always|collapseActionView"
+          android:title="@string/menuSelectAll">
+    </item>
+    
+    
+
+</menu>

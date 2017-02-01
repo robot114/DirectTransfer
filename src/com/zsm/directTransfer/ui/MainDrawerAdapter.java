@@ -12,7 +12,7 @@ import com.zsm.directTransfer.R;
 public class MainDrawerAdapter extends BaseAdapter {
 	
 	public static final int TRANSFER_ITEM_POSITION = 0;
-	public static final int NEW_PEER_ITEM_POSITION = 1;
+	public static final int PEER_ITEM_POSITION = 1;
 	
 	public static final int END_OF_POSITION = 2;
 	
