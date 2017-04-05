@@ -104,4 +104,7 @@ public class ExpandableChileFileData implements ExpandableListChildGroup {
 		return mFile.getAbsolutePath();
 	}
 
+	public File getFile() {
+		return mFile;
+	}
 }

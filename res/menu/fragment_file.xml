@@ -5,16 +5,28 @@
           android:icon="@drawable/file_list_add"
           android:showAsAction="always">
     </item>
-    <item android:id="@+id/itemSearchFolder" android:title="@string/menuFileSearchFolder" android:icon="@drawable/file_list_search_folder" android:showAsAction="always"></item><item android:id="@+id/itemClearList"
+    <item android:id="@+id/itemSearchFolder"
+          android:title="@string/menuFileSearchFolder"
+          android:icon="@drawable/file_list_search_folder"
+          android:showAsAction="always">
+    </item>
+    <item android:id="@+id/itemClearList"
           android:title="@string/menuClearFileList"
           android:icon="@drawable/file_list_clear"
           android:showAsAction="always">
     </item>
+    <item android:id="@+id/itemUpload"
+          android:icon="@drawable/file_send"
+          android:showAsAction="always|collapseActionView"
+          android:title="@string/menuFileSearchFolder">
+    </item>
     <item android:id="@+id/itemSelectAll"
           android:checkable="true"
           android:showAsAction="always|collapseActionView"
-          android:title="@string/menuSelectAll">
+          android:title="@string/menuSelectAll"
+          android:icon="@drawable/select_all">
     </item>
+    
     
     
 

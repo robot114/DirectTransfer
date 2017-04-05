@@ -1,5 +1,7 @@
 package com.zsm.directTransfer.ui;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.Observable;
 import java.util.Observer;
 
@@ -7,18 +9,41 @@ import android.app.ActionBar;
 import android.app.Activity;
 import android.app.Fragment;
 import android.app.FragmentManager;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.net.wifi.p2p.WifiP2pDevice;
+import android.net.wifi.p2p.WifiP2pManager;
+import android.net.wifi.p2p.WifiP2pManager.ActionListener;
+import android.net.wifi.p2p.WifiP2pManager.Channel;
 import android.os.Bundle;
 import android.support.v4.widget.DrawerLayout;
 import android.view.Menu;
 import android.view.MenuItem;
 
+import com.zsm.android.ui.fileselector.FileOperation;
 import com.zsm.directTransfer.R;
+import com.zsm.directTransfer.connection.MessageConnectionManager;
+import com.zsm.directTransfer.connection.PeerConnectionManager;
+import com.zsm.directTransfer.connection.PeerMessageConnection;
+import com.zsm.directTransfer.connection.PeerMessageConnection.MessageConnectionListener;
 import com.zsm.directTransfer.data.WifiP2pPeer;
+import com.zsm.directTransfer.transfer.operation.DirectFileOperation;
+import com.zsm.directTransfer.transfer.operation.WriteFileOperation;
+import com.zsm.directTransfer.ui.FileFragment.UploadOperator;
+import com.zsm.directTransfer.wifip2p.WifiP2pGroupManager;
+import com.zsm.log.Log;
 
 public class MainActivity extends Activity implements
-		NavigationDrawerFragment.NavigationDrawerCallbacks {
+		NavigationDrawerFragment.NavigationDrawerCallbacks, UploadOperator,
+		MessageConnectionListener {
 
 	final static int FRAGMENT_FILE_POSITION = MainDrawerAdapter.END_OF_POSITION;
+	
+	static final private int[] TITLE_RES_ID
+		= new int[]{ R.string.titleTransfer, R.string.titleDiscover,
+					 R.string.titleFile };
 	/**
 	 * Fragment managing the behaviors, interactions and presentation of the
 	 * navigation drawer.
@@ -36,19 +61,23 @@ public class MainActivity extends Activity implements
 	private Observer mPeerSelectionObserver;
 
 	private Fragment[] mFragment = new Fragment[FRAGMENT_FILE_POSITION+1];
+	private WifiP2pManager mManager;
+	private Channel mChannel;
 
-	static final private int[] TITLE_RES_ID
-		= new int[]{ R.string.titleTransfer, R.string.titleDiscover,
-					 R.string.titleFile };
+	private BroadcastReceiver mMyselfWifiP2pReceiver;
+	private WifiP2pDevice mMyselfDevice;
 
+	
 	private void intiFragments() {
 		
 		mStatusBarFragment = new StatusBarFragment( this );
 		
 		mFragment[MainDrawerAdapter.TRANSFER_ITEM_POSITION]
-				= new TransferFragment( this, mStatusBarFragment );
+				= new TransferFragment( this, mStatusBarFragment,
+										mManager, mChannel );
 		
-		PeerFragment fp = new PeerFragment( this, mStatusBarFragment );
+		PeerFragment pf
+			= new PeerFragment( this, mStatusBarFragment, mManager, mChannel );
 		mPeerSelectionObserver = new Observer() {
 			@Override
 			public void update(Observable o, Object arg) {
@@ -56,10 +85,10 @@ public class MainActivity extends Activity implements
 				onPeerSelected(peer);
 			}
 		};
-		mFragment[MainDrawerAdapter.PEER_ITEM_POSITION] = fp;
-		fp.registerPeerSelectionObserver(mPeerSelectionObserver);
+		mFragment[MainDrawerAdapter.PEER_ITEM_POSITION] = pf;
+		pf.registerPeerSelectionObserver(mPeerSelectionObserver);
 		
-		FileFragment ff = new FileFragment(this);
+		FileFragment ff = new FileFragment(this, this, mStatusBarFragment);
 		mFragment[FRAGMENT_FILE_POSITION] = ff;
 	}
 
@@ -67,9 +96,17 @@ public class MainActivity extends Activity implements
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		
+	    mManager
+	    	= (WifiP2pManager) getSystemService(Context.WIFI_P2P_SERVICE);
+	    mChannel = mManager.initialize(this, getMainLooper(), null);
+	    
 		intiFragments();
+		
 		setContentView(R.layout.main);
-
+// TODO
+		PeerConnectionManager.initInstance(mManager, this);
+		initServer();
+		
 		FragmentManager fragmentManager = getFragmentManager();
 		fragmentManager
 				.beginTransaction()
@@ -85,6 +122,36 @@ public class MainActivity extends Activity implements
 		// Set up the drawer.
 		mNavigationDrawerFragment.setUp(R.id.navigation_drawer,
 				(DrawerLayout) findViewById(R.id.drawer_layout));
+
+		mMyselfWifiP2pReceiver = new BroadcastReceiver() {
+			@Override
+			public void onReceive(Context context, Intent intent) {
+				mMyselfDevice
+					= intent.getParcelableExtra(WifiP2pManager.EXTRA_WIFI_P2P_DEVICE);
+				WifiP2pGroupManager.getInstance().updateMyselfDevice(mMyselfDevice);
+				unregisterReceiver(mMyselfWifiP2pReceiver);
+				mMyselfWifiP2pReceiver = null;
+			}
+		};
+		IntentFilter myselfFilter
+			= new IntentFilter( WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION  );
+		registerReceiver( mMyselfWifiP2pReceiver, myselfFilter);
+	}
+	
+	private void initServer() {
+		
+		// For the group owner, the server socket must be start,
+		// as the GO does not know the address of the client.
+		// This is a limitation of Android. For the wifi p2p
+		// specification, the GO should allocate the address for
+		// the client.
+		// After the client announce itself, any member in the group can
+		// connect to it. So event the client need to listen the message
+		// port
+		MessageConnectionManager.getInstance().initInstance( this, this, mStatusBarFragment );
+		MessageConnectionManager.getInstance().startMessageServer();
+		
+		WifiP2pGroupManager.getInstance().start();
 	}
 
 	@Override
@@ -140,8 +207,96 @@ public class MainActivity extends Activity implements
 		return super.onOptionsItemSelected(item);
 	}
 
+	@Override
+	protected void onDestroy() {
+		if( mMyselfWifiP2pReceiver != null ) {
+			unregisterReceiver(mMyselfWifiP2pReceiver);
+			mMyselfWifiP2pReceiver = null;
+		}
+		
+		MessageConnectionManager.getInstance().close();
+		WifiP2pGroupManager.getInstance().close();
+		
+		super.onDestroy();
+	}
+
 	private void onPeerSelected( WifiP2pPeer peer ) {
+		PeerConnectionManager.getInstance().requestPeerP2pConnection( 
+				peer, getWifiP2pConnectionActionListener( peer ) );
+		
 		toFragment(FRAGMENT_FILE_POSITION);
+		
+		FileFragment ff = (FileFragment) mFragment[FRAGMENT_FILE_POSITION];
+		ff.setPeer( peer );
 	}
 	
+	@Override
+	public void newUploadEntry(File[] source, WifiP2pPeer peer) {
+		DirectFileOperation wfo = new WriteFileOperation( source, true );
+		
+		PeerMessageConnection pmc
+			= PeerConnectionManager.getInstance().getPeerMessageConnection(peer);
+		Log.d( "File operation will be sent to peer", wfo, pmc );
+		if( pmc != null ) {
+			pmc.sendOperation(wfo);
+		}
+		
+		// TODO Auto-generated method stub
+		toFragment(MainDrawerAdapter.TRANSFER_ITEM_POSITION);
+		
+		TransferFragment tf = getTransferFragment();
+
+		tf.addUploadEntry( source, peer );
+	}
+
+	private TransferFragment getTransferFragment() {
+		return (TransferFragment) mFragment[MainDrawerAdapter.TRANSFER_ITEM_POSITION];
+	}
+	
+	
+	@Override
+	public void onConnectionFatalError( PeerMessageConnection connection,
+									    Exception reason ) {
+		
+		Log.w( reason,
+			   "Fatal error to the connection hanppened, try to reconnection",
+			   connection );
+		try {
+			connection.reconnect( );
+		} catch (IOException e) {
+			Log.e( e, "Reconnect failed!", connection );
+		}
+	}
+
+	@Override
+	public void connected(PeerMessageConnection peerMessageConnection) {
+		// TODO Auto-generated method stub
+		
+	}
+	
+	private ActionListener getWifiP2pConnectionActionListener( final WifiP2pPeer peer ) {
+		ActionListener listener = new ActionListener() {
+
+			@Override
+		    public void onSuccess() {
+				String text
+					= getString(R.string.promptSucceedToTryToConnectPeer,
+								peer.getUserDefinedName() );
+				mStatusBarFragment.setNormalStatus( text );
+		    }
+
+		    @Override
+		    public void onFailure(int reason) {
+				String reasonStr
+					= ResourceUtility.getWifiP2pFailReason(MainActivity.this, reason);
+				String text
+					= getString(R.string.promptFailedToTryToConnectPeer,
+								peer.getUserDefinedName(), reasonStr);
+
+				mStatusBarFragment.setErrorStatus( text );
+		    }
+
+		};
+		return listener;
+	}
 }

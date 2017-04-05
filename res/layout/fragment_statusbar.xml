@@ -12,9 +12,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_margin="@dimen/defaultMargin"
-        android:lines="2"
-        android:maxLines="2"
-        android:text="@string/hintStartDiscovering"
+        android:text="Try to connect to peer &apos;XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX&apos; failed! The reason is \&apos;system is busy\&apos;."
         android:textAppearance="?android:attr/textAppearanceMedium" />
 
 </LinearLayout>

@@ -38,9 +38,13 @@ public class PeerFragment extends Fragment {
 	
 	private Observer mPeerListObserver;
 
-	public PeerFragment(Context context, StatusBarOperator statusOperator) {
+	public PeerFragment(Context context, StatusBarOperator statusOperator,
+						WifiP2pManager manager, Channel channel) {
+		
 		mContext = context;
 		mStatusBarOperator = statusOperator;
+		mManager = manager;
+		mChannel = channel;
 		
 	    // Initialize List adapter here to avoid NullPointerException when 
 	    // registerPeerSelectionObserver and addPeerListObserver(Observer)
@@ -57,11 +61,7 @@ public class PeerFragment extends Fragment {
 	public void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		
-	    mManager
-	    	= (WifiP2pManager) mContext.getSystemService(
-	    			Context.WIFI_P2P_SERVICE);
-	    
-	    mChannel = mManager.initialize(mContext, mContext.getMainLooper(), null);
+	    mListAdapter.setChannel( mChannel );
 
 	    mIsDiscovering = false;
 	    
@@ -95,7 +95,7 @@ public class PeerFragment extends Fragment {
 						break;
 					}
 					
-					setHint(hintResId, StatusBarOperator.STATUS_WARNING);
+					setErrorHint(hintResId);
 					
 					Log.w( "Fail to enable wifi. Reason code", reason );
 				}
@@ -125,6 +125,8 @@ public class PeerFragment extends Fragment {
 	}
 	
 	private void startToDiscover() {
+		Log.d( "Start to discover peers" );
+		mIsDiscovering = true;
 		mManager.discoverPeers(mChannel, new DiscoverListener( true ) );
 	}
 	
@@ -144,22 +146,27 @@ public class PeerFragment extends Fragment {
 	}
 
 	@Override
-	public void onDetach() {
-		super.onDetach();
+	public void onDestroyView() {
+		super.onDestroyView();
 		WifiUtility.getInstance().unregisterWifiEnableReceiver( mContext );
 		mListAdapter.unregisterPeerStateBroadcastReceiver();
 		if( mIsDiscovering ) {
-			mManager.stopPeerDiscovery(mChannel, new DiscoverListener( false ) );
-			mIsDiscovering = false;
+//			Log.d( "Stop discoverying peers." );
+//			mManager.stopPeerDiscovery(mChannel, new DiscoverListener( false ) );
+//			mIsDiscovering = false;
 		}
 	}
 
-	private void setHint(int textResId, int status) {
-		mStatusBarOperator.setStatus(textResId, status);
+	private void setNormalHint(int textResId) {
+		mStatusBarOperator.setNormalStatus(textResId);
 	}
 
-	private void setHint( String text, int status ) {
-		mStatusBarOperator.setStatus(text, status);
+	private void setErrorHint(int resId) {
+		mStatusBarOperator.setErrorStatus(resId);
+	}
+	
+	private void setErrorHint(String text) {
+		mStatusBarOperator.setErrorStatus(text);
 	}
 	
 	private void addPeerListObserver() {
@@ -167,10 +174,9 @@ public class PeerFragment extends Fragment {
 			@Override
 			public void update(Observable o, Object arg) {
 				ArrayList<?> list = (ArrayList<?>)arg;
-				setHint( list.size() == 0 
-							? R.string.hintStartDiscovering 
-							: R.string.hintSelectPeerToTransfer,
-						 StatusBarOperator.STATUS_NORMAL );
+				setNormalHint( list.size() == 0 
+								? R.string.hintStartDiscovering 
+								: R.string.hintSelectPeerToTransfer );
 			}
 		};
 		
@@ -200,40 +206,25 @@ public class PeerFragment extends Fragment {
 			if( mStart ) {
 				Log.d( "Start to discover peers successfully!" );
 				hintResId = R.string.hintStartDiscovering;
+				setNormalHint( hintResId );
 			} else {
 				Log.d( "Stop discovering peers successflly!" );
-				hintResId = R.string.hintStopDiscovering;
 			}
-			
-			setHint( hintResId, StatusBarOperator.STATUS_NORMAL );
 		}
 
 		@Override
 		public void onFailure(int reason) {
-			Log.w( "Discover peers failed. Reason is", reason, "action is start: ", mStart );
+			Log.w( "Discover peers failed. Reason is", reason,
+				   "action is start: ", mStart );
 
-			int reasonId;
-			switch( reason ) {
-				case WifiP2pManager.P2P_UNSUPPORTED:
-					reasonId = R.string.promptFailedToDiscoverPeerReasonUnsupport;
-					break;
-				case WifiP2pManager.BUSY:
-					reasonId = R.string.promptFailedToDiscoverPeerReasonBusy;
-					break;
-				default:
-					reasonId = R.string.promptFailedToDiscoverPeerReasonError;
-					break;
-			}
-			
-			String reasonStr = mContext.getString( reasonId );
+			String reasonStr
+				= ResourceUtility.getWifiP2pFailReason(mContext, reason);
 			String text
-				= mContext.getString( R.string.promptFailedToDiscoverPeer,
-									   reasonStr );
+				= mContext.getString(R.string.promptFailedToDiscoverPeer,
+									 reasonStr);
 			
-			setHint( text, StatusBarOperator.STATUS_WARNING );
+			setErrorHint( text );
 			mIsDiscovering = false;
 		}
-		
 	}
-
 }

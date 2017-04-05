@@ -77,4 +77,24 @@ public class StatusBarFragment extends Fragment implements StatusBarOperator {
 				break;
 		}
 	}
+
+	@Override
+	public void setNormalStatus(String text) {
+		setStatus(text, STATUS_NORMAL);
+	}
+
+	@Override
+	public void setNormalStatus(int resId) {
+		setStatus(resId, STATUS_NORMAL);
+	}
+
+	@Override
+	public void setErrorStatus(String text) {
+		setStatus(text, STATUS_WARNING);
+	}
+
+	@Override
+	public void setErrorStatus(int resId) {
+		setStatus(resId, STATUS_WARNING);
+	}
 }

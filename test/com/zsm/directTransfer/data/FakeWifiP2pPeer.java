@@ -12,7 +12,7 @@ public class FakeWifiP2pPeer extends WifiP2pPeer {
 	}
 
 	@Override
-	public String getAddress() {
+	public String getMacAddress() {
 		return mAddress;
 	}
 

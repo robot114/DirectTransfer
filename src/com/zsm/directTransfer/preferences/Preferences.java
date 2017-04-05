@@ -1,5 +1,7 @@
 package com.zsm.directTransfer.preferences;
 
+import java.io.File;
+
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.SharedPreferences.OnSharedPreferenceChangeListener;
@@ -11,11 +13,15 @@ import com.zsm.log.Log;
 
 public class Preferences {
 
+	private static final String KEY_WRITE_PATH = "KEY_WRITE_PATH";
+
 	private static final String PREFERENCES_BASE_NAME = "DirectTransferPreferences";
 
 	private static final int PREFRENCES_VERSION = 1;
 
 	private static final String KEY_READ_PATH = "KEY_READ_PATH";
+	private static final String KEY_MAX_TRANSFER_THREAD_NUM
+									= "KEY_MAX_TRANSFER_THREAD_NUM";
 	
 	static private Preferences instance;
 	final private SharedPreferences preferences;
@@ -100,5 +106,18 @@ public class Preferences {
 
 	public void setReadPath(String absolutePath) {
 		preferences.edit().putString(KEY_READ_PATH, absolutePath).commit();
+	}
+
+	public int getMaxTransferThreadNum() {
+		return preferences.getInt( KEY_MAX_TRANSFER_THREAD_NUM, 5 );
+	}
+
+	public String getWritePath() {
+		File defaultDir = mContext.getDir( "Downloads", Context.MODE_PRIVATE);
+		return preferences.getString( KEY_WRITE_PATH, defaultDir.getAbsolutePath() );
+	}
+
+	public boolean isAppend() {
+		return preferences.getBoolean( "KEY_APPEND", true );
 	}
 }

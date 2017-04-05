@@ -68,7 +68,7 @@ public class PeerListDbOperator implements PeerListOperator {
 			id = db.insertOrThrow(TABLE_NAME, null, convertData(peer) );
 			db.setTransactionSuccessful();
 			Log.d( "Peer added", "name", peer.getShowName(),
-				   "address", peer.getAddress() );
+				   "address", peer.getMacAddress() );
 		} catch ( SQLException e ) {
 			Log.e( e, "Add new peer failed", peer );
 		} finally {
@@ -92,10 +92,10 @@ public class PeerListDbOperator implements PeerListOperator {
 		db.beginTransaction();
 		try {
 			rows = db.update(TABLE_NAME, convertData(peer), ADDRESS_WHERE_CLAUSE,
-							 new String[]{peer.getAddress()} );
+							 new String[]{peer.getMacAddress()} );
 			db.setTransactionSuccessful();
 			Log.d( "Peer update", "name", peer.getShowName(),
-				   "address", peer.getAddress() );
+				   "address", peer.getMacAddress() );
 		} catch ( SQLException e ) {
 			Log.e( e, "Update peer failed", peer );
 		} finally {
@@ -119,10 +119,10 @@ public class PeerListDbOperator implements PeerListOperator {
 		db.beginTransaction();
 		try {
 			rows = db.delete(TABLE_NAME, ADDRESS_WHERE_CLAUSE,
-							 new String[]{peer.getAddress()} );
+							 new String[]{peer.getMacAddress()} );
 			db.setTransactionSuccessful();
 			Log.d( "Peer delete", "name", peer.getShowName(),
-				   "address", peer.getAddress() );
+				   "address", peer.getMacAddress() );
 		} catch ( SQLException e ) {
 			Log.e( e, "delete peer failed", peer );
 		} finally {
@@ -167,7 +167,7 @@ public class PeerListDbOperator implements PeerListOperator {
 		SQLiteDatabase db = mSqliteOpenHelper.getReadableDatabase();
 		Cursor c
 			= db.query( TABLE_NAME, COLUMNS, COLUMN_ADDRESS + "= ?",
-						new String[]{ peer.getAddress() },
+						new String[]{ peer.getMacAddress() },
 						null, null, COLUMN_USER_DEFINED_NAME );
 
 		return c.getCount() == 1;
@@ -175,7 +175,7 @@ public class PeerListDbOperator implements PeerListOperator {
 	
 	private ContentValues convertData( WifiP2pPeer peer ) {
 		ContentValues data = new ContentValues();
-		data.put(COLUMN_ADDRESS, peer.getAddress());
+		data.put(COLUMN_ADDRESS, peer.getMacAddress());
 		data.put(COLUMN_USER_DEFINED_NAME, peer.getUserDefinedName());
 		data.put(COLUMN_DEVICE_NAME, peer.getDeviceName());
 		data.put(COLUMN_PRIMARY_TYPE, peer.getType());

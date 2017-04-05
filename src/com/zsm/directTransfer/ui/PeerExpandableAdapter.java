@@ -16,6 +16,7 @@ import android.content.res.Resources;
 import android.net.wifi.p2p.WifiP2pDevice;
 import android.net.wifi.p2p.WifiP2pDeviceList;
 import android.net.wifi.p2p.WifiP2pManager;
+import android.net.wifi.p2p.WifiP2pManager.Channel;
 import android.view.LayoutInflater;
 import android.view.MenuInflater;
 import android.view.MenuItem;
@@ -35,6 +36,7 @@ import android.widget.Toast;
 import com.zsm.directTransfer.R;
 import com.zsm.directTransfer.data.WifiP2pPeer;
 import com.zsm.directTransfer.preferences.PeerListOperator;
+import com.zsm.log.Log;
 
 @SuppressLint("InflateParams")
 public class PeerExpandableAdapter extends BaseExpandableListAdapter {
@@ -72,6 +74,7 @@ public class PeerExpandableAdapter extends BaseExpandableListAdapter {
 	// Observable used to notify the observer that a peer is selected.
 	// Only one observer will be registered
 	private PeerObservable mPeerSelectionObservable = new PeerObservable();
+	private Channel mChannel;
 
 	PeerExpandableAdapter( Context context, PeerListOperator o ) {
 		mContext = context;
@@ -81,6 +84,10 @@ public class PeerExpandableAdapter extends BaseExpandableListAdapter {
 		mNameClickListener = nameClickListener();
 		mNameLongClickListener = nameLongClickListener();
 		mRemoveClickListener = removeClickListener();
+	}
+	
+	void setChannel( Channel channel ) {
+		mChannel = channel;
 	}
 	
 	private OnClickListener removeClickListener() {
@@ -130,18 +137,22 @@ public class PeerExpandableAdapter extends BaseExpandableListAdapter {
 			WifiP2pPeer savedPeer = mPeerList.get(n);
 			savedPeer.setDevice( peer.getDevice() );
 			savedPeer.setPersistened(true);
+			savedPeer.setChannel( mChannel );
 		} else {
 			peer.setPersistened(false);
+			peer.setChannel( mChannel );
 			mPeerList.add(peer);
 		}
 	}
 	
 	void clearPeersNotPersisitened() {
 		int size = mPeerList.size();
-		for( int i = size -1; i >= 0; i-- ) {
+		for( int i = size - 1; i >= 0; i-- ) {
 			WifiP2pPeer peer = mPeerList.get(i);
 			if( !peer.isPersistened() ) {
 				mPeerList.remove( i );
+			} else {
+				peer.getDevice().status = WifiP2pDevice.UNAVAILABLE;
 			}
 		}
 	}
@@ -367,7 +378,7 @@ public class PeerExpandableAdapter extends BaseExpandableListAdapter {
 		switch( childPosition ) {
 			case CHILD_POS_ADDRESS:
 				buf.append( resources.getString( R.string.peerDataAddress ) )
-				   .append( peer.getAddress() );
+				   .append( peer.getMacAddress() );
 				break;
 			case CHILD_POS_STATUS:
 				buf.append(  resources.getString(R.string.peerDataStatus ))
@@ -407,27 +418,6 @@ public class PeerExpandableAdapter extends BaseExpandableListAdapter {
 		return false;
 	}
 
-	private class PeerStateBroadcastReceiver extends BroadcastReceiver {
-
-		@Override
-		public void onReceive(Context context, Intent intent) {
-			WifiP2pDeviceList list
-				= intent.getParcelableExtra( WifiP2pManager.EXTRA_P2P_DEVICE_LIST );
-			if( WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION.equals(intent.getAction())
-				&& list != null	) {
-				
-				Collection<WifiP2pDevice> deviceList = list.getDeviceList();
-				clearPeersNotPersisitened();
-				for( WifiP2pDevice device : deviceList ) {
-					peerDiscovered( new WifiP2pPeer( device ) );
-				}
-				mAvailablePeersCount = deviceList.size();
-				notifyDataSetChanged();
-			}
-		}
-		
-	}
-	
 	int getAvailablePeersCount() {
 		return mAvailablePeersCount;
 	}
@@ -482,5 +472,30 @@ public class PeerExpandableAdapter extends BaseExpandableListAdapter {
 		return status == WifiP2pDevice.AVAILABLE
 			|| status == WifiP2pDevice.CONNECTED
 			|| status == WifiP2pDevice.INVITED;
+	}
+	
+	private class PeerStateBroadcastReceiver extends BroadcastReceiver {
+
+		@Override
+		public void onReceive(Context context, Intent intent) {
+			Log.d( "Peer changed broadcast received.", intent );
+			WifiP2pDeviceList list
+				= intent.getParcelableExtra( WifiP2pManager.EXTRA_P2P_DEVICE_LIST );
+			if( WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION.equals(intent.getAction()) ) {
+				
+				clearPeersNotPersisitened();
+				if( list != null ) {
+					Collection<WifiP2pDevice> deviceList = list.getDeviceList();
+					for( WifiP2pDevice device : deviceList ) {
+						peerDiscovered( new WifiP2pPeer( device ) );
+					}
+					mAvailablePeersCount = deviceList.size();
+				} else {
+					mAvailablePeersCount = 0;
+				}
+				notifyDataSetChanged();
+			}
+		}
+		
 	}
 }

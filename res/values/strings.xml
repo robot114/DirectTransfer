@@ -26,6 +26,10 @@
     <string name="promptPeerUnavailable">Peer \'%1$s\' is not available. Open the peer wifi direct, please.</string>
     <string name="promptPermissReadStorage">External storage is access denied. Grant the permission first.</string>
     <string name="promptClearFileList">All the files will be removed from this list. Are you sure?</string>
+    <string name="promptNoFileSelectedToTransfer">No file selected to transfer.</string>
+    <string name="promptFailToStartListening">Failed to prepare connection!</string>
+    <string name="promptFailedToTryToConnectPeer">Try to connect to peer \'%1$s\' failed! The reason is \'%2$s\'.</string>
+    <string name="promptSucceedToTryToConnectPeer">Try to connect to peer \'%1$s\'.</string>
     <string name="goBack">Go Back</string>
     <string name="hintStartDiscovering">Discover started. Make the peer to start discovering too, please.</string>
     <string name="hintStopDiscovering">Discover stopped.</string>
@@ -45,5 +49,9 @@
     <string name="menuClearFileList">Clear File List</string>
     <string name="menuSelectAll">Select All</string>
     <string name="menuFileSearchFolder">Search Folder</string>
+    <string name="menuFileSend">Send Selected</string>
+    <string name="statusFilePeer">Selected files are to be sent to %1$s</string>
+    <string name="menuPeerAsReceiver">Peer as Receiver</string>
+    <string name="menuPeerAsUploader">Peer as Uploader</string>
     
 </resources>

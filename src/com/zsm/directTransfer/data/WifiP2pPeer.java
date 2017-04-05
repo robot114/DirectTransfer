@@ -1,9 +1,11 @@
 package com.zsm.directTransfer.data;
 
+import java.net.InetAddress;
 import java.util.Locale;
 import java.util.Observable;
 
 import android.net.wifi.p2p.WifiP2pDevice;
+import android.net.wifi.p2p.WifiP2pManager.Channel;
 import android.os.Parcel;
 import android.os.Parcelable;
 
@@ -11,7 +13,9 @@ public class WifiP2pPeer extends Observable implements Parcelable {
 
 	private String mUserDefinedName;
 	private WifiP2pDevice mDevice;
+	private InetAddress mInetAddress;
 	private boolean mPersistened;
+	private Channel mChannel;
 	
 	public WifiP2pPeer( String userDefinedName, WifiP2pDevice peer ) {
 		if( userDefinedName != null && userDefinedName.trim().length() == 0 ) {
@@ -63,11 +67,19 @@ public class WifiP2pPeer extends Observable implements Parcelable {
 		mPersistened = persistened;
 	}
 
+    public InetAddress getInetAddress() {
+		return mInetAddress;
+	}
+
+	public void setInetAddress(InetAddress mInetAddress) {
+		this.mInetAddress = mInetAddress;
+	}
+
 	public String getDeviceName() {
 		return mDevice.deviceName;
 	}
 	
-	public String getAddress() {
+	public String getMacAddress() {
 		return mDevice.deviceAddress;
 	}
 	
@@ -78,13 +90,26 @@ public class WifiP2pPeer extends Observable implements Parcelable {
 	public int getStatus() {
 		return mDevice.status;
 	}
+
+	public void setChannel(Channel channel) {
+		mChannel = channel;
+	}
+	
+	public Channel getChannel() {
+		return mChannel;
+	}
 	
 	public String getDescription() {
         StringBuffer sbuf = new StringBuffer();
-        if( mUserDefinedName != null ) {
-        	sbuf.append("Device: ").append(mDevice.deviceName);
+    	sbuf.append("Device: ")
+    		.append(mUserDefinedName == null 
+    				? mDevice.deviceName : mUserDefinedName );
+    	
+        if( mInetAddress != null ) {
+        	sbuf.append("\n IP Address: ").append(mInetAddress.getHostAddress());
         }
-        sbuf.append("\n Address: ").append(mDevice.deviceAddress);
+        
+        sbuf.append("\n Mac Address: ").append(mDevice.deviceAddress);
         sbuf.append("\n Type: ").append(mDevice.primaryDeviceType);
         sbuf.append("\n Status: ").append(mDevice.status);
         return sbuf.toString();
@@ -101,7 +126,7 @@ public class WifiP2pPeer extends Observable implements Parcelable {
 
 	@Override
 	public int hashCode() {
-		return getAddress().toLowerCase(Locale.US).hashCode();
+		return getMacAddress().toLowerCase(Locale.US).hashCode();
 	}
 
 	@Override
@@ -112,7 +137,7 @@ public class WifiP2pPeer extends Observable implements Parcelable {
 			return false;
 		}
 		
-		return peer == this || peer.getAddress().equalsIgnoreCase(getAddress());
+		return peer == this || peer.getMacAddress().equalsIgnoreCase(getMacAddress());
 	}
 
 	@Override
@@ -126,7 +151,7 @@ public class WifiP2pPeer extends Observable implements Parcelable {
     	dest.writeParcelable( mDevice, 0 );
     }
 
-    /** Implement the Parcelable interface */
+	/** Implement the Parcelable interface */
     public static final Creator<WifiP2pPeer> CREATOR =
         new Creator<WifiP2pPeer>() {
             public WifiP2pPeer createFromParcel(Parcel in) {
