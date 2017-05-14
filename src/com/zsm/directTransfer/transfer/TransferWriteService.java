@@ -13,10 +13,9 @@ import java.util.concurrent.TimeoutException;
 import com.zsm.directTransfer.connection.DataConnection;
 import com.zsm.directTransfer.connection.DataConnectionManager;
 import com.zsm.directTransfer.preferences.Preferences;
-import com.zsm.directTransfer.transfer.TransferProgressor.Generator;
+import com.zsm.directTransfer.transfer.TransferProgressor.REASON;
 import com.zsm.directTransfer.transfer.operation.BadPacketException;
 import com.zsm.directTransfer.transfer.operation.ConnectionSyncException;
-import com.zsm.directTransfer.transfer.operation.DirectFileOperation.FileInfo;
 import com.zsm.directTransfer.transfer.operation.DirectMessager;
 import com.zsm.directTransfer.transfer.operation.DirectOperation;
 import com.zsm.directTransfer.transfer.operation.ReadFileOperation;
@@ -26,24 +25,23 @@ public class TransferWriteService implements Runnable, AutoCloseable {
 	
 	private static TransferWriteService mInstance;
 	private ExecutorService mPool;
-	private Generator mProgressorGenerator;
 
-	private TransferWriteService() throws IOException {
-		DataConnectionManager.getInstance().startListening();
+	private TransferWriteService() {
 		mPool = Executors.newFixedThreadPool(
 				Preferences.getInstance().getMaxTransferThreadNum() );
 	}
 	
 	public static TransferWriteService getInstance() throws IOException {
-		if( mInstance == null ) {
-			mInstance = new TransferWriteService();
-		}
-		
 		return mInstance;
 	}
 
-	public void setProgressorGenerator( TransferProgressor.Generator g  ) {
-		mProgressorGenerator = g;
+	public static void start( ) {
+		if( mInstance != null ) {
+			throw new IllegalStateException( 
+						"TransferWriteService has been started!" );
+		}
+		mInstance = new TransferWriteService( );
+		new Thread( mInstance ).start();
 	}
 	
 	@Override
@@ -66,9 +64,7 @@ public class TransferWriteService implements Runnable, AutoCloseable {
 		DataConnectionManager dcm = DataConnectionManager.getInstance();
 		while( dcm.isServerStarted() ) {
 			try {
-				WriteTask wt
-					= new WriteTask( dcm.accept(),
-									 mProgressorGenerator.newProgressor() );
+				WriteTask wt = new WriteTask( dcm.accept() );
 				mPool.execute( wt );
 			} catch (IOException e) {
 				Log.e( e, "Failed to accept data connection" );
@@ -76,44 +72,59 @@ public class TransferWriteService implements Runnable, AutoCloseable {
 		}
 	}
 
-	private class WriteTask implements Runnable, Closeable {
+	class WriteTask extends TransferTask implements Runnable, Closeable {
 
-		private DataConnection mConnection;
-		private TransferProgressor mProgressor;
-		private FileInfo mFileInfo;
-
-		private WriteTask( DataConnection dataConnection, TransferProgressor tp ) {
+		private WriteTask( DataConnection dataConnection ) {
 			mConnection = dataConnection;
-			mProgressor = tp;
+			mConnection.setTransferTask( this );
+			setState( STATE.INIT );
 		}
 		
 		@Override
 		public void close() throws IOException {
+			if( getState() != STATE.FINISHED ) {
+				setState( STATE.CANCELLED );
+			}
+			
 			if( mConnection != null ) {
 				mConnection.close();
 			}
 			mConnection = null;
-			
+			unlock();
 		}
 
+		synchronized private void unlock() {
+			if( getState() == STATE.PAUSED ) {
+				mLock.notifyAll();
+			}
+		}
+		
 		@Override
 		public void run() {
+			mFileTraqnsferInfo = null;
 			try {
 				write();
 			} catch ( FileNotFoundException  e ) {
-				Log.e( e, "File not found", mFileInfo );
-				mProgressor.failed(mFileInfo, TransferProgressor.REASON.FILE_NOT_FOUND);
+				setState( STATE.FAILED );
+				Log.e( e, "File not found", mFileTraqnsferInfo );
+				mProgressor.failed(mFileTraqnsferInfo, REASON.FILE_NOT_FOUND);
 			} catch (UnsupportedOperationException | ConnectionSyncException
 					 | BadPacketException | IOException e) {
+				setState( STATE.FAILED );
 				Log.e( e, "Invalid packet, reset the data connection" );
-				mProgressor.failed( mFileInfo, TransferProgressor.REASON.IO_ERROR );
+				mProgressor.failed( mFileTraqnsferInfo, REASON.IO_ERROR );
 			} catch (InterruptedException e) {
-				Log.e( e, "Transfer interrupted", mFileInfo );
-				mProgressor.failed( mFileInfo, TransferProgressor.REASON.CANCELLED );
+				Log.d( "Transfer interrupted", mFileTraqnsferInfo );
+				mProgressor.failed( mFileTraqnsferInfo, REASON.CANCELLED );
 			} catch (TimeoutException e) {
+				setState( STATE.FAILED );
 				Log.e( e, "Transfer timeout" );
-				mProgressor.failed( mFileInfo, TransferProgressor.REASON.IO_ERROR );
+				mProgressor.failed( mFileTraqnsferInfo, REASON.IO_ERROR );
 			} finally {
+				if( mFileTraqnsferInfo != null ) {
+					TransferProgressorManager.getInstance()
+						.removeByTransferId( mFileTraqnsferInfo.getId() );
+				}
 				try {
 					close();
 				} catch (IOException e) {
@@ -127,6 +138,7 @@ public class TransferWriteService implements Runnable, AutoCloseable {
 				   InterruptedException, ConnectionSyncException,
 				   BadPacketException, TimeoutException {
 			
+			setState( STATE.PREPARING );
 			DirectOperation op = mConnection.receiveOperation( 3000 );
 			byte opCode = op.getOpCode();
 			if( opCode != DirectMessager.OPCODE_TYPE_READ_FILE ) {
@@ -134,30 +146,72 @@ public class TransferWriteService implements Runnable, AutoCloseable {
 						"Should be read file opcode. OpCode is " + opCode );
 			}
 			ReadFileOperation rfo = (ReadFileOperation)op;
-			mFileInfo = rfo.getFileInfo();
-			File file = new File( mFileInfo.mFilePathName );
-			mProgressor.start(mFileInfo);
+			mProgressor
+				= TransferProgressorManager.getInstance()
+					.getByTransferId( mFileTraqnsferInfo.getId() );
+			
+			mProgressor.setTransferTask( this );
+
+			mFileTraqnsferInfo = rfo.getFileInfo();
+			File file = new File( mFileTraqnsferInfo.getFilePathName() );
+			mProgressor.start(mFileTraqnsferInfo);
 			FileInputStream fis = null;
 			try {
 				fis = new FileInputStream( file );
 				long totalLen = 0;
-				if( mFileInfo.mStartPosition > 0 ) {
-					fis.skip(mFileInfo.mStartPosition);
-					totalLen = mFileInfo.mStartPosition;
+				long startPosition = mFileTraqnsferInfo.getStartPosition();
+				if( startPosition > 0 ) {
+					fis.skip(startPosition);
+					totalLen = startPosition;
 				}
 				int len = 0;
 				byte[] buffer = new byte[2048];
+				setState( STATE.STARTED );
 				while( ( len = fis.read( buffer  ) ) > 0 ) {
-					mConnection.write( buffer, 0, len );
-					Thread.sleep( 10 );
-					totalLen += len;
-					mProgressor.update( mFileInfo, totalLen, mFileInfo.mSize );
+					totalLen = doWrite(totalLen, len, buffer);
+					if( getState() == STATE.CANCELLED ) {
+						throw new InterruptedException( "Stopped by user!" );
+					}
 				}
-				mProgressor.succeed( mFileInfo );
+				setState( STATE.FINISHED );
+				mProgressor.succeed( mFileTraqnsferInfo );
 			} finally {
 				if( fis != null ) {
 					fis.close();
 				}
+			}
+		}
+
+		private long doWrite(long totalLen, int len, byte[] buffer)
+				throws IOException, InterruptedException {
+
+			synchronized( mLock ) {
+				mConnection.write( buffer, 0, len );
+				Thread.sleep( 10 );
+				totalLen += len;
+				mProgressor.update( mFileTraqnsferInfo, totalLen );
+				
+				while( getState() == STATE.PAUSED ) {
+					mLock.wait();
+				}
+				
+				return totalLen;
+			}
+		}
+		
+		@Override
+		public void resumeByPeer() {
+			synchronized( mLock ) {
+				super.resumeByPeer();
+				unlock();
+			}
+		}
+		
+		@Override
+		public void resumeByUi() {
+			synchronized( mLock ) {
+				super.resumeByUi();
+				mLock.notifyAll();
 			}
 		}
 	}

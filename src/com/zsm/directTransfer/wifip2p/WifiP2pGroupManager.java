@@ -21,6 +21,7 @@ import android.net.wifi.p2p.WifiP2pDevice;
 import android.net.wifi.p2p.WifiP2pGroup;
 
 import com.zsm.directTransfer.data.WifiP2pPeer;
+import com.zsm.directTransfer.transfer.operation.DirectOperation;
 import com.zsm.log.Log;
 
 /**
@@ -58,7 +59,6 @@ public class WifiP2pGroupManager implements Closeable, AutoCloseable {
 	private DatagramSocket mReceiveSocket;
 	private ByteBuffer mOutputBuffer;
 	private Thread mReceiveThread;
-	private byte[] mInputBuffer;
 	private DatagramPacket mReceivePacket;
 	private DatagramSocket mSendSocket;
 
@@ -80,29 +80,23 @@ public class WifiP2pGroupManager implements Closeable, AutoCloseable {
 		return GROUP_ANNOUNCE_PORT;
 	}
 
-	public void start() {
+	public void start() throws SocketException {
 		if( mReceiveSocket != null ) {
 			throw new IllegalStateException( "Group manager has started before!" );
 		}
+		
+		byte[] inputBuffer = new byte[MAX_DEVICE_NAME_LENGTH];
+		mReceivePacket
+			= new DatagramPacket( inputBuffer, MAX_DEVICE_NAME_LENGTH );
+		
+		mReceiveSocket = new DatagramSocket( GROUP_ANNOUNCE_PORT );
+		Log.d( "Start to listern peer announce port.",
+				GROUP_ANNOUNCE_PORT );
 		mReceiveThread = new Thread( "Thread-ExchangeGroupInfo" ) {
 			@Override
 			public void run() {
 				mOutputBuffer
 					= ByteBuffer.allocateDirect( MEMBER_PACKET_MAX_LEN );
-				
-				mInputBuffer = new byte[MAX_DEVICE_NAME_LENGTH];
-				mReceivePacket
-					= new DatagramPacket( mInputBuffer, MAX_DEVICE_NAME_LENGTH );
-				
-				try {
-					mReceiveSocket = new DatagramSocket( GROUP_ANNOUNCE_PORT );
-					Log.d( "Start to listern peer announce port.",
-							GROUP_ANNOUNCE_PORT );
-				} catch (SocketException e) {
-					Log.e( e, "Cannot listen to the GROUP_ANNOUNCE_PORT",
-						   GROUP_ANNOUNCE_PORT );
-					return;
-				}
 				try {
 					receiveAnnounce();
 				} catch (InterruptedException e) {
@@ -176,7 +170,7 @@ public class WifiP2pGroupManager implements Closeable, AutoCloseable {
 						"Type", type, "position", i );
 				break;
 			}
-			int valueLen = ( buffer[i] << 8 ) + buffer[i+1];
+			int valueLen = DirectOperation.bytesToShort(buffer, i);
 			i += 2;
 			device.deviceName
 				= new String( buffer, i, valueLen, NAME_ENCODE );
@@ -191,7 +185,7 @@ public class WifiP2pGroupManager implements Closeable, AutoCloseable {
 						"Type", type, "position", i );
 				break;
 			}
-			valueLen = ( buffer[i] << 8 ) + buffer[i+1];
+			valueLen = DirectOperation.bytesToShort(buffer, i);
 			i += 2;
 			device.deviceAddress
 				= new String( buffer, i, valueLen, ADDRESS_ENCODE );
@@ -201,7 +195,7 @@ public class WifiP2pGroupManager implements Closeable, AutoCloseable {
 			if( type == TYPE_INET_ADDRESS ) {
 				// InetAddress is optional
 				i++;
-				valueLen = (buffer[i] << 8) + buffer[i+1];
+				valueLen = DirectOperation.bytesToShort(buffer, i);
 				i += 2;
 				String addressStr
 					= new String( buffer, i, valueLen, ADDRESS_ENCODE );
@@ -260,6 +254,7 @@ public class WifiP2pGroupManager implements Closeable, AutoCloseable {
 		for( WifiP2pPeer peer : mMembers ) {
 			if( peer.getInetAddress() != null && !peer.equals( mMyself) ) {
 				sendNotifyPacket(peer.getInetAddress(), packet);
+				Log.d( "Announce all members to peer. ", "members", mMembers, "peer", peer );
 			}
 		}
 	}
@@ -275,7 +270,6 @@ public class WifiP2pGroupManager implements Closeable, AutoCloseable {
 		mOutputBuffer = null;
 		
 		mReceivePacket = null;
-		mInputBuffer = null;
 		
 		mMembers.clear();
 	}
@@ -425,7 +419,9 @@ public class WifiP2pGroupManager implements Closeable, AutoCloseable {
 		
 		for( WifiP2pPeer p : mMembers ) {
 			if( p.getMacAddress().equalsIgnoreCase( peer.getMacAddress() ) ) {
-				return p.getInetAddress();
+				inetAddress = p.getInetAddress();
+				peer.setInetAddress(inetAddress);
+				return inetAddress;
 			}
 		}
 		
@@ -475,6 +471,16 @@ public class WifiP2pGroupManager implements Closeable, AutoCloseable {
 	}
 	
 	private static int getAddressNumber( byte[] address ) {
-		return (address[0] << 24) + (address[1] << 16) + (address[2] << 8) + address[0];
+		return DirectOperation.bytesToInt(address, 0);
+	}
+	
+	public WifiP2pPeer findPeerByAddress( InetAddress address ) {
+		for( WifiP2pPeer p : mMembers ) {
+			if( p.getInetAddress().equals( address ) ) {
+				return p;
+			}
+		}
+		
+		return null;
 	}
 }

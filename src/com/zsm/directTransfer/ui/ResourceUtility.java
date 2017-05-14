@@ -4,7 +4,6 @@ import android.content.Context;
 import android.net.wifi.p2p.WifiP2pManager;
 
 import com.zsm.directTransfer.R;
-import com.zsm.directTransfer.data.WifiP2pPeer;
 
 public class ResourceUtility {
 

@@ -6,67 +6,63 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.net.InetAddress;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 
-import com.zsm.directTransfer.connection.DataConnection;
 import com.zsm.directTransfer.connection.DataConnectionManager;
+import com.zsm.directTransfer.data.FileTransferObject;
 import com.zsm.directTransfer.preferences.Preferences;
-import com.zsm.directTransfer.transfer.operation.DirectFileOperation.FileInfo;
+import com.zsm.directTransfer.transfer.TransferProgressor.REASON;
+import com.zsm.directTransfer.transfer.operation.DirectFileOperation.FileTransferInfo;
 import com.zsm.log.Log;
 
 public class TransferReadService implements Runnable, AutoCloseable {
 
-	private class TransferFile {
-		private FileInfo mFileInfo;
-		private InetAddress mPeer;
-		private TransferProgressor mProgressor;
-		
-		TransferFile( FileInfo fi, InetAddress peer, TransferProgressor tp ) {
-			mFileInfo = fi;
-			mPeer = peer;
-			mProgressor = tp;
-		}
-	}
-	
 	private static TransferReadService mInstance;
-	private final BlockingQueue<TransferFile> mQueue;
+	
+	private final BlockingQueue<FileTransferObject> mQueue;
 	private final ExecutorService mPool;
 	private boolean mClosed;
 
 	private TransferReadService() {
-		mQueue = new LinkedBlockingQueue<TransferFile>();
+		mQueue = new LinkedBlockingQueue<FileTransferObject>();
 		mPool = Executors.newFixedThreadPool(
 					Preferences.getInstance().getMaxTransferThreadNum() );
 		
 		mClosed = false;
 	}
 	
-	public static TransferReadService getInstance() {
-		if( mInstance == null ) {
-			mInstance = new TransferReadService();
+	public static void start() {
+		if( mInstance != null ) {
+			throw new IllegalStateException( 
+						"TransferReadService has been started!" );
 		}
-		
+		mInstance = new TransferReadService( );
+		new Thread( mInstance ).start();
+	}
+	
+	public static TransferReadService getInstance() {
 		return mInstance;
 	}
 	
-	public void add( FileInfo fi, InetAddress peer, TransferProgressor tp )
+	public void add( FileTransferInfo fti, TransferProgressor p )
 						throws InterruptedException {
 		
-		mQueue.put( new TransferFile( fi, peer, tp ) );
+		p.start(fti);
+		FileTransferObject fto = new FileTransferObject(fti, p);
+		mQueue.put( fto );
 	}
 
 	@Override
 	public void run() {
 		while( !mClosed ) {
 			try {
-				TransferFile tf = mQueue.take();
-				mPool.execute( new ReadTask( tf.mFileInfo, tf.mPeer,
-											 tf.mProgressor ) );
+				FileTransferObject tf = mQueue.take();
+				mPool.execute( new ReadTask( tf.getFileTransferInfo(),
+											 tf.getProgressor() ) );
 			} catch (InterruptedException e) {
 			} finally {
 				close();
@@ -76,6 +72,7 @@ public class TransferReadService implements Runnable, AutoCloseable {
 
 	@Override
 	public void close() {
+		Log.d( "Read is to be closed." );
 		mClosed = true;
 		mQueue.clear();
 		mPool.shutdown();
@@ -91,39 +88,37 @@ public class TransferReadService implements Runnable, AutoCloseable {
 		}
 	}
 	
-	private class ReadTask implements Runnable, Closeable {
+	class ReadTask extends TransferTask implements Runnable, Closeable {
 
-		private boolean mStop;
-		private FileInfo mFileInfo;
-		private InetAddress mPeer;
-		private TransferProgressor mProgressor;
 		private OutputStream mOutputStream;
-		private DataConnection mConnection;
-
-		private ReadTask( FileInfo fi, InetAddress peer,
-						  TransferProgressor progressor ) {
+		
+		private ReadTask( FileTransferInfo fti, TransferProgressor p ) {
+			super( fti );
 			
-			mFileInfo = fi;
-			mPeer = peer;
-			mProgressor = progressor;
+			mProgressor = p;
+			mProgressor.setTransferTask( this );
 		}
 		
 		@Override
 		public void run() {
 			try {
 				read();
-				mProgressor.succeed( mFileInfo );
+				mProgressor.succeed( mFileTraqnsferInfo );
 			} catch ( FileNotFoundException e ) {
-				Log.e( e, "Create file failed", mFileInfo.mFilePathName );
-				mProgressor.failed( mFileInfo,
-									TransferProgressor.REASON.CANNOT_CREATE_FILE );
+				Log.e( e, "Create file failed", mFileTraqnsferInfo.getFilePathName() );
+				mProgressor.failed( mFileTraqnsferInfo, REASON.CANNOT_CREATE_FILE );
 			} catch (IOException e) {
-				Log.e( e, "Error for I/O", mFileInfo );
-				mProgressor.failed( mFileInfo, TransferProgressor.REASON.IO_ERROR );
+				Log.e( e, "Error for I/O", mFileTraqnsferInfo );
+				mProgressor.failed( mFileTraqnsferInfo, REASON.IO_ERROR );
 			} catch (InterruptedException e) {
-				Log.e( e, "Transfer interrupted", mFileInfo );
-				mProgressor.failed( mFileInfo, TransferProgressor.REASON.CANCELLED );
+				Log.e( e, "Transfer interrupted", mFileTraqnsferInfo );
+				mProgressor.failed( mFileTraqnsferInfo, REASON.CANCELLED );
 			} finally {
+				if( mFileTraqnsferInfo != null ) {
+					TransferProgressorManager.getInstance()
+						.removeByTransferId( mFileTraqnsferInfo.getId() );
+				}
+
 				try {
 					close();
 				} catch (IOException e) {
@@ -135,46 +130,66 @@ public class TransferReadService implements Runnable, AutoCloseable {
 		private void read() throws IOException, InterruptedException {
 			mOutputStream = openOutputStream();
 			mConnection
-				= DataConnectionManager.getInstance().connectToServer( mPeer );
-			mConnection.sendRequestOperation( mFileInfo );
+				= DataConnectionManager.getInstance()
+					.connectToServer( mFileTraqnsferInfo.getPeer() );
+			
+			mConnection.setTransferTask( this );
+			mConnection.sendRequestOperation( mFileTraqnsferInfo );
 			int len = 0;
 			byte[] buffer = new byte[2048];
 			long totalLen 
-				= mFileInfo.mStartPosition > 0 ? mFileInfo.mStartPosition : 0;
-			mProgressor.start( mFileInfo );
-			while( !mStop && ( len = mConnection.read( buffer ) ) >= 0 ) {
+				= mFileTraqnsferInfo.getStartPosition() > 0
+					? mFileTraqnsferInfo.getStartPosition() : 0;
+					
+			mProgressor.start( mFileTraqnsferInfo );
+			// The read task will not pause. When the peer's write task paused, the read
+			// task will be paused as not data received
+			while( ( len = mConnection.read( buffer ) ) >= 0 ) {
+				
 				mOutputStream.write(buffer, 0, len);
-				Thread.sleep( 10 );
 				totalLen += len;
-				mProgressor.update( mFileInfo, totalLen, mFileInfo.mSize );
+				mProgressor.update( mFileTraqnsferInfo, totalLen );
+				// Do not know who interrupts and why. So do not invoke sleep
+//				Thread.sleep( 100 );
+				if( getState() == STATE.CANCELLED ) {
+					throw new InterruptedException( "Stopped by user!" );
+				}
 			}
 		}
 
 		private OutputStream openOutputStream() throws FileNotFoundException {
 			File file = new File( getLocalFileName() );
+			
 			boolean append
 				= Preferences.getInstance().isAppend()
-					&& file.exists() && file.length() < mFileInfo.mSize;
+					&& file.exists() && file.length() <= mFileTraqnsferInfo.getSize();
 			
 			if( append ) {
-				mFileInfo.mStartPosition = mFileInfo.mStartPosition;
+				mFileTraqnsferInfo.setStartPosition( file.length() );
 			}
+			
+			Log.d( "File to store.", file );
 			return new FileOutputStream( file, append );
 		}
 
 		private String getLocalFileName() {
 			int separatorIndex
-				= mFileInfo.mFilePathName.lastIndexOf( File.pathSeparator );
-			String fn = mFileInfo.mFilePathName;
+				= mFileTraqnsferInfo.getFilePathName().lastIndexOf( File.separator );
+			String fn = mFileTraqnsferInfo.getFilePathName();
 			if( separatorIndex > 0 ) {
 				fn = fn.substring( separatorIndex + 1 );
 			}
-			return Preferences.getInstance().getWritePath() + File.pathSeparator + fn;
+			return Preferences.getInstance().getWritePath() + File.separator + fn;
 		}
 
 		@Override
 		public void close() throws IOException {
-			mStop = true;
+			Log.d( "Read task is to be closed." );
+			
+			if( getState() != STATE.FINISHED ) {
+				setState( STATE.CANCELLED );
+			}
+			
 			if( mOutputStream != null ) {
 				mOutputStream.close();
 			}
@@ -185,6 +200,23 @@ public class TransferReadService implements Runnable, AutoCloseable {
 			}
 			mConnection = null;
 		}
-		
+
+		@Override
+		public void resumeByPeer() {
+			// TODO Auto-generated method stub
+			
+		}
+
+		@Override
+		public void pauseByPeer() {
+			// TODO Auto-generated method stub
+			
+		}
+
+		@Override
+		public void cancelByPeer() {
+			// TODO Auto-generated method stub
+			
+		}
 	}
 }

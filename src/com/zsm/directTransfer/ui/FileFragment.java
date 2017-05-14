@@ -22,8 +22,8 @@ import android.widget.Toast;
 
 import com.anthonycr.grant.PermissionsManager;
 import com.anthonycr.grant.PermissionsResultAction;
-import com.zsm.android.ui.CheckableExpandableChildListAdapter;
-import com.zsm.android.ui.CheckableExpandableListAdapter.OnCheckedChangedListener;
+import com.zsm.android.ui.CheckableExpandableChildTextListAdapter;
+import com.zsm.android.ui.CheckableExpandableTextListAdapter.OnCheckedChangedListener;
 import com.zsm.android.ui.fileselector.FileOperation;
 import com.zsm.android.ui.fileselector.FileSelector;
 import com.zsm.android.ui.fileselector.OnHandleFileListener;
@@ -42,7 +42,7 @@ public class FileFragment extends Fragment
 	private Context mContext;
 	private StatusBarOperator mStatusOperator;
 	
-	private CheckableExpandableChildListAdapter<ExpandableChileFileData> mListAdapter;
+	private CheckableExpandableChildTextListAdapter<ExpandableChileFileData> mListAdapter;
 	private MenuItem mSelectAllMenuItem;
 	private WifiP2pPeer mCurrentPeer;
 	private UploadOperator mUploadOperator;
@@ -70,7 +70,7 @@ public class FileFragment extends Fragment
 		ExpandableListView listView
 			= (ExpandableListView) view.findViewById( R.id.listViewFile );
 		mListAdapter
-			= new CheckableExpandableChildListAdapter<ExpandableChileFileData>(
+			= new CheckableExpandableChildTextListAdapter<ExpandableChileFileData>(
 						mContext, false );
 		listView.setAdapter(mListAdapter);
 		

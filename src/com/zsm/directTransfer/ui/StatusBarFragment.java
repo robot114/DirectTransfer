@@ -6,6 +6,8 @@ import com.zsm.directTransfer.R;
 import android.app.Fragment;
 import android.content.Context;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -37,19 +39,21 @@ public class StatusBarFragment extends Fragment implements StatusBarOperator {
 	}
 
 	@Override
-	public void setStatus(String text, int status) {
+	public void setStatus(final String text, final int status) {
 		if( mTextView != null ) {
-			mTextView.setText( text );
-			setAppearance(status);
+			new Handler( Looper.getMainLooper() ).post( new Runnable() {
+				@Override
+				public void run() {
+					mTextView.setText( text );
+					setAppearance(status);
+				}
+			} );
 		}
 	}
 
 	@Override
 	public void setStatus(int resId, int status) {
-		if( mTextView != null ) {
-			mTextView.setText( resId );
-			setAppearance(status);
-		}
+		setStatus( mContext.getString(resId), status );
 	}
 
 	@Override

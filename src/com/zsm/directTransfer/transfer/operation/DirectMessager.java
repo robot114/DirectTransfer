@@ -7,6 +7,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.concurrent.TimeoutException;
 
+import com.zsm.directTransfer.data.WifiP2pPeer;
 import com.zsm.log.Log;
 
 public class DirectMessager implements Closeable {
@@ -36,14 +37,15 @@ public class DirectMessager implements Closeable {
 	static final int LENGTH_VER = 1;
 	static final byte VALUE_VER = 0x10;
 	
-	static final int LENGTH_SERIAL_NO = 2;
+	static final int LENGTH_SERIAL_NO = 8;
 	
 	static final int LENGTH_OPCODE = 1;
 	
 	// Add new opcode here
-	static final byte OPCODE_TYPE_STATUS = 0;
-	static final byte OPCODE_TYPE_WRITE_FILE = 1;
+	public static final byte OPCODE_TYPE_STATUS = 0;
+	public static final byte OPCODE_TYPE_WRITE_FILE = 1;
 	public static final byte OPCODE_TYPE_READ_FILE = 2;
+	public static final byte OPCODE_TYPE_FILE_OPERATION = 3;
 	
 	static final Class<?>[] OPCODE_ARRAY 
 		= { StatusOperation.class, WriteFileOperation.class, 
@@ -58,11 +60,14 @@ public class DirectMessager implements Closeable {
 
 	private byte[] mInputBuffer;
 
+	private WifiP2pPeer mPeer;
+
 	static final String READABLE_ENCODE = "UTF-8";
 	
-	public DirectMessager(InputStream in, OutputStream out ) {
+	public DirectMessager(InputStream in, OutputStream out, WifiP2pPeer peer ) {
 		mInputStream = in;
 		mOutputStream = out;
+		mPeer = peer;
 		mInputBuffer = new byte[LENGTH_BUFFER];
 	}
 
@@ -112,7 +117,7 @@ public class DirectMessager implements Closeable {
 		if (len < 0) {
 			return null;
 		}
-		totalLen = (mInputBuffer[0] << 8) + mInputBuffer[1];
+		totalLen = DirectOperation.bytesToShort(mInputBuffer, 0);
 		if (totalLen < 0) {
 			throw new ConnectionSyncException("Invalid message total length: "
 					+ totalLen);
@@ -125,6 +130,14 @@ public class DirectMessager implements Closeable {
 		}
 		totalLen -= len;
 
+		len = readOneItem( LENGTH_SERIAL_NO, mInputBuffer, true, timeoutSysTime );
+		if (len < 0) {
+			mInputStream.skip(totalLen);
+			return null;
+		}
+		totalLen -= len;
+		long sn = DirectOperation.bytesToLong( mInputBuffer, 0 );
+		
 		len = readOneItem(LENGTH_OPCODE, mInputBuffer, true, timeoutSysTime);
 		if (len < 0) {
 			mInputStream.skip(totalLen);
@@ -136,6 +149,7 @@ public class DirectMessager implements Closeable {
 		DirectOperation op = null;
 		try {
 			op = (DirectOperation) OPCODE_ARRAY[opCode].newInstance();
+			op.setSerialNo( sn );
 			Log.d("Operation received, opcode: ", opCode);
 		} catch (InstantiationException | IllegalAccessException e) {
 			Log.w(e, "Cannot new instance operation", "opCode", opCode);
@@ -158,7 +172,7 @@ public class DirectMessager implements Closeable {
 			len = readOneItem(ARG_LENGTH_LENGTH, mInputBuffer, true,
 					timeoutSysTime);
 
-			int argLen = (mInputBuffer[0] << 8) + mInputBuffer[1];
+			int argLen = DirectOperation.bytesToShort(mInputBuffer, 0);
 			totalLen -= len;
 
 			if (argLen > totalLen) {
@@ -175,7 +189,7 @@ public class DirectMessager implements Closeable {
 			len = readOneItem(argLen, mInputBuffer, true, timeoutSysTime);
 			totalLen -= len;
 
-			op.addArgument(argType, argLen, mInputBuffer);
+			op.addArgument(argType, argLen, mInputBuffer, mPeer);
 		}
 
 		Log.d("Detail of the operation received", op);
@@ -202,13 +216,11 @@ public class DirectMessager implements Closeable {
 				// All the bytes must be read once the first one read
 				if (readSize == 0 && !blockBeforeRead) {
 					return -1;
-				} else {
-					Thread.sleep(100);
-					continue;
 				}
+			} else {
+				lenToRead -= len;
+				readSize += len;
 			}
-			lenToRead -= len;
-			readSize += len;
 		}
 
 		return readSize;
@@ -223,7 +235,7 @@ public class DirectMessager implements Closeable {
 
 	}
 
-	private void sendOperation( DirectOperation op, OutputStream os )
+	private long sendOperation( DirectOperation op, OutputStream os )
 							throws IOException {
 		
 		DataOutputStream dos = new DataOutputStream(os);
@@ -231,18 +243,24 @@ public class DirectMessager implements Closeable {
 		dos.write(MAGIC_COOKIE);
 		
 		// The length itself is not included
-		int totalLen = LENGTH_VER + LENGTH_OPCODE + op.calcTotalArgumentsLength();
+		int totalLen
+			= LENGTH_VER + LENGTH_OPCODE + LENGTH_SERIAL_NO
+				+ op.calcTotalArgumentsLength();
+		
 		dos.write( (byte)(totalLen>>8) );
 		dos.write( (byte)totalLen );
 		dos.write( VALUE_VER );
+		dos.writeLong( op.getSerialNo() );
 		op.outputOperation( dos );
 		
 		dos.flush();
 		
 		os.flush();
+		
+		return op.getSerialNo();
 	}
 
-	public void sendOperation( DirectOperation op ) throws IOException {
-		sendOperation(op, mOutputStream );
+	public long sendOperation( DirectOperation op ) throws IOException {
+		return sendOperation(op, mOutputStream );
 	}
 }

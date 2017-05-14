@@ -1,13 +1,13 @@
 package com.zsm.directTransfer.connection;
 
-import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.concurrent.ConcurrentHashMap;
 
-import com.zsm.directTransfer.transfer.operation.DirectFileOperation;
+import com.zsm.directTransfer.data.WifiP2pPeer;
 import com.zsm.log.Log;
 
 public class DataConnectionManager implements AutoCloseable {
@@ -15,9 +15,10 @@ public class DataConnectionManager implements AutoCloseable {
 	private static final int DATA_CONNECTION_PORT = 8889;
 	private static DataConnectionManager mInstance;
 	private ServerSocket mServerSocket;
+	private ConcurrentHashMap<Long, DataConnection> mDataConnectionTable;
 
 	private DataConnectionManager() {
-		
+		mDataConnectionTable = new ConcurrentHashMap<Long, DataConnection>();
 	}
 	
 	public static DataConnectionManager getInstance() {
@@ -49,31 +50,6 @@ public class DataConnectionManager implements AutoCloseable {
 		mServerSocket = null;
 	}
 
-	private class DataServerThread extends Thread {
-		
-		DataServerThread() {
-			super( "DataServerThread" );
-		}
-		
-		@Override
-		public void run() {
-			while( isServerStarted() ) {
-				try {
-					Socket socket = mServerSocket.accept();
-				} catch (IOException e) {
-					Log.e( e, "Failed to accept the data connection" );
-					try {
-						mServerSocket.close();
-					} catch (IOException e1) {
-						Log.w( e1, "Failed to close the mServerSocket" );
-					}
-					mServerSocket = null;
-					break;
-				}
-			}
-		}
-	}
-	
 	public DataConnection connectToServer( InetAddress server )
 				throws IOException {
 		
@@ -86,7 +62,26 @@ public class DataConnectionManager implements AutoCloseable {
 		return new DataConnection( socket );
 	}
 
+	public DataConnection connectToServer( WifiP2pPeer server )
+				throws IOException {
+		
+		InetAddress address = server.getInetAddress();
+		return connectToServer(address);
+	}
+
 	public DataConnection accept() throws IOException {
 		return new DataConnection( mServerSocket.accept() );
+	}
+
+	public void add(long serialNo, DataConnection dataConnection) {
+		mDataConnectionTable.put(serialNo, dataConnection);
+	}
+
+	public DataConnection remove(long serialNo) {
+		return mDataConnectionTable.remove(serialNo);
+	}
+
+	public DataConnection getConnection(long serialNo) {
+		return mDataConnectionTable.get(serialNo);
 	}
 }

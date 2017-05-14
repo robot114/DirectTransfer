@@ -7,10 +7,14 @@ import java.util.Observer;
 
 import android.app.ActionBar;
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.app.Fragment;
 import android.app.FragmentManager;
 import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.DialogInterface;
+import android.content.DialogInterface.OnCancelListener;
+import android.content.DialogInterface.OnClickListener;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.net.wifi.p2p.WifiP2pDevice;
@@ -21,14 +25,18 @@ import android.os.Bundle;
 import android.support.v4.widget.DrawerLayout;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.widget.Toast;
 
-import com.zsm.android.ui.fileselector.FileOperation;
 import com.zsm.directTransfer.R;
+import com.zsm.directTransfer.connection.DataConnectionManager;
 import com.zsm.directTransfer.connection.MessageConnectionManager;
 import com.zsm.directTransfer.connection.PeerConnectionManager;
 import com.zsm.directTransfer.connection.PeerMessageConnection;
 import com.zsm.directTransfer.connection.PeerMessageConnection.MessageConnectionListener;
 import com.zsm.directTransfer.data.WifiP2pPeer;
+import com.zsm.directTransfer.transfer.TransferProgressorManager;
+import com.zsm.directTransfer.transfer.TransferReadService;
+import com.zsm.directTransfer.transfer.TransferWriteService;
 import com.zsm.directTransfer.transfer.operation.DirectFileOperation;
 import com.zsm.directTransfer.transfer.operation.WriteFileOperation;
 import com.zsm.directTransfer.ui.FileFragment.UploadOperator;
@@ -67,9 +75,16 @@ public class MainActivity extends Activity implements
 	private BroadcastReceiver mMyselfWifiP2pReceiver;
 	private WifiP2pDevice mMyselfDevice;
 
+	private Thread mWaitPeerConnectionThread;
+
+	private AlertDialog mWaitingForPeerConnectionDialog;
+
 	
+	public MainActivity() {
+		super();
+	}
+
 	private void intiFragments() {
-		
 		mStatusBarFragment = new StatusBarFragment( this );
 		
 		mFragment[MainDrawerAdapter.TRANSFER_ITEM_POSITION]
@@ -99,14 +114,14 @@ public class MainActivity extends Activity implements
 	    mManager
 	    	= (WifiP2pManager) getSystemService(Context.WIFI_P2P_SERVICE);
 	    mChannel = mManager.initialize(this, getMainLooper(), null);
-	    
+    
 		intiFragments();
+		TransferProgressorManager.init( getTransferFragment() );
 		
 		setContentView(R.layout.main);
-// TODO
-		PeerConnectionManager.initInstance(mManager, this);
-		initServer();
 		
+		initConnectionManagers();
+		initTransferService();
 		FragmentManager fragmentManager = getFragmentManager();
 		fragmentManager
 				.beginTransaction()
@@ -138,8 +153,9 @@ public class MainActivity extends Activity implements
 		registerReceiver( mMyselfWifiP2pReceiver, myselfFilter);
 	}
 	
-	private void initServer() {
+	private void initConnectionManagers() {
 		
+		PeerConnectionManager.initInstance(mManager, this);
 		// For the group owner, the server socket must be start,
 		// as the GO does not know the address of the client.
 		// This is a limitation of Android. For the wifi p2p
@@ -148,10 +164,26 @@ public class MainActivity extends Activity implements
 		// After the client announce itself, any member in the group can
 		// connect to it. So event the client need to listen the message
 		// port
-		MessageConnectionManager.getInstance().initInstance( this, this, mStatusBarFragment );
-		MessageConnectionManager.getInstance().startMessageServer();
+		MessageConnectionManager.getInstance()
+			.initInstance( this, this, mStatusBarFragment );
 		
-		WifiP2pGroupManager.getInstance().start();
+		try {
+			MessageConnectionManager.getInstance().startMessageServer();
+			WifiP2pGroupManager.getInstance().start();
+			DataConnectionManager.getInstance().startListening();
+		} catch ( IOException e ) {
+			Toast.makeText( this,
+							R.string.promptFailToStartListening,
+							Toast.LENGTH_LONG )
+				 .show();
+			
+			finish();
+		}
+	}
+	
+	private void initTransferService() {
+		TransferReadService.start();
+		TransferWriteService.start();
 	}
 
 	@Override
@@ -220,33 +252,94 @@ public class MainActivity extends Activity implements
 		super.onDestroy();
 	}
 
-	private void onPeerSelected( WifiP2pPeer peer ) {
+	private void onPeerSelected( final WifiP2pPeer peer ) {
 		PeerConnectionManager.getInstance().requestPeerP2pConnection( 
 				peer, getWifiP2pConnectionActionListener( peer ) );
 		
-		toFragment(FRAGMENT_FILE_POSITION);
+		mWaitPeerConnectionThread = new Thread( new Runnable() {
+			@Override
+			synchronized public void run() {
+				PeerMessageConnection pmc
+					= PeerConnectionManager.getInstance()
+						.getPeerMessageConnection(peer);
+				Log.d( "PeerMessageConnection is not established, "
+						+ "wait for the connection for peer",
+						peer );
+				
+				while( pmc == null ) {
+					try {
+						wait( 500 );
+					} catch (InterruptedException e) {
+						// May be cancelled by the user
+						Log.d( "Thread wait for peer connection is interrupted!" );
+						break;
+					}
+					pmc = PeerConnectionManager.getInstance()
+							.getPeerMessageConnection(peer);
+				}
+				
+				if( pmc != null ) {
+					if( mWaitingForPeerConnectionDialog != null ) {
+						mWaitingForPeerConnectionDialog.dismiss();
+					}
+					
+					toFragment(FRAGMENT_FILE_POSITION);
+					
+					FileFragment ff = (FileFragment) mFragment[FRAGMENT_FILE_POSITION];
+					ff.setPeer( peer );
+				}
+				mWaitPeerConnectionThread = null;
+				mWaitingForPeerConnectionDialog = null;
+			}
+		}, "Thead-WaitPeerConnection" );
 		
-		FileFragment ff = (FileFragment) mFragment[FRAGMENT_FILE_POSITION];
-		ff.setPeer( peer );
+		mWaitPeerConnectionThread.start();
+		
+		mWaitingForPeerConnectionDialog
+			= getWaitingForPeerConnectionDialog(peer, mWaitPeerConnectionThread );
+		mWaitingForPeerConnectionDialog.show();
+	}
+	
+	private AlertDialog getWaitingForPeerConnectionDialog( 
+				final WifiP2pPeer peer, final Thread thread ) {
+		
+		String message
+			= getString( R.string.promptWaitForPeerToConnect,
+						 peer.getUserDefinedName() );
+		AlertDialog dialog
+			= new AlertDialog.Builder(this)
+					.setMessage(message)
+					.setCancelable(true)
+					.setOnCancelListener(new OnCancelListener () {
+						@Override
+						public void onCancel(DialogInterface dialog) {
+							mWaitPeerConnectionThread = null;
+							mWaitingForPeerConnectionDialog = null;
+							thread.interrupt();
+						}
+					})
+					.setNegativeButton( android.R.string.cancel, null )
+					.create();
+		
+		return dialog;
 	}
 	
 	@Override
 	public void newUploadEntry(File[] source, WifiP2pPeer peer) {
-		DirectFileOperation wfo = new WriteFileOperation( source, true );
+		DirectFileOperation wfo = new WriteFileOperation( source, peer, true );
 		
 		PeerMessageConnection pmc
 			= PeerConnectionManager.getInstance().getPeerMessageConnection(peer);
-		Log.d( "File operation will be sent to peer", wfo, pmc );
+		Log.d( "File operation will be sent to peer", "WriteFileOperation", wfo,
+			   "PeerMessageConnection", pmc );
+		
 		if( pmc != null ) {
 			pmc.sendOperation(wfo);
+			getTransferFragment().addTransferOperation( wfo.getFileTransferInfoList() );
 		}
 		
 		// TODO Auto-generated method stub
 		toFragment(MainDrawerAdapter.TRANSFER_ITEM_POSITION);
-		
-		TransferFragment tf = getTransferFragment();
-
-		tf.addUploadEntry( source, peer );
 	}
 
 	private TransferFragment getTransferFragment() {

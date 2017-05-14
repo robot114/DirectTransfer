@@ -1,12 +1,14 @@
 package com.zsm.directTransfer.preferences;
 
 import java.io.File;
+import java.io.IOException;
 
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.SharedPreferences.OnSharedPreferenceChangeListener;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
+import android.os.Environment;
 import android.preference.PreferenceManager;
 
 import com.zsm.log.Log;
@@ -113,11 +115,15 @@ public class Preferences {
 	}
 
 	public String getWritePath() {
-		File defaultDir = mContext.getDir( "Downloads", Context.MODE_PRIVATE);
-		return preferences.getString( KEY_WRITE_PATH, defaultDir.getAbsolutePath() );
+		String defaultDir = Environment.getExternalStorageDirectory() + "/DirctTransfer";
+		File dir = new File ( preferences.getString( KEY_WRITE_PATH, defaultDir ) );
+		boolean b = dir.mkdirs();
+		Log.d( "Create dir for download result.", b, dir );
+		
+		return dir.getAbsolutePath();
 	}
 
 	public boolean isAppend() {
-		return preferences.getBoolean( "KEY_APPEND", true );
+		return preferences.getBoolean( "KEY_APPEND", false );
 	}
 }

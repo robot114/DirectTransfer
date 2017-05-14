@@ -4,6 +4,8 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 
+import com.zsm.directTransfer.connection.PeerMessageConnection;
+import com.zsm.directTransfer.data.WifiP2pPeer;
 import com.zsm.log.Log;
 
 public class StatusOperation extends DirectOperation {
@@ -15,7 +17,9 @@ public class StatusOperation extends DirectOperation {
 	static final int LENGTH_STATUS = 1;
 	static final byte VALUE_STATUS_OK = 0;
 	static final byte VALUE_STATUS_NO_RESPONSE = 1;
+	static final byte VALUE_STATUS_NOT_SUPPORTED = 2;
 	static final byte VLAUE_STATUS_NO_FILE = 10;
+	static final byte VALUE_STATUS_NO_SUCH_FILE_OPERATION = 11;
 	
 	static final byte TYPE_REASON = 1;
 	
@@ -51,7 +55,7 @@ public class StatusOperation extends DirectOperation {
 	}
 
 	@Override
-	void addArgument(byte type, int dataLen, byte[] data)
+	void addArgument(byte type, int dataLen, byte[] data, WifiP2pPeer peer)
 				throws BadPacketException {
 		
 		switch( type ) {
@@ -77,7 +81,7 @@ public class StatusOperation extends DirectOperation {
 	}
 
 	@Override
-	public StatusOperation doOperation() {
+	public StatusOperation doOperation( PeerMessageConnection connection ) {
 		// Should not be invoked
 		return null;
 	}

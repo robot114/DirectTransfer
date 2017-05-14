@@ -9,11 +9,13 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.concurrent.TimeoutException;
 
+import com.zsm.directTransfer.data.WifiP2pPeer;
 import com.zsm.directTransfer.transfer.operation.BadPacketException;
 import com.zsm.directTransfer.transfer.operation.ConnectionSyncException;
 import com.zsm.directTransfer.transfer.operation.DirectMessager;
 import com.zsm.directTransfer.transfer.operation.DirectOperation;
 import com.zsm.directTransfer.transfer.operation.StatusOperation;
+import com.zsm.directTransfer.wifip2p.WifiP2pGroupManager;
 import com.zsm.log.Log;
 
 public class PeerMessageConnection implements Closeable {
@@ -27,6 +29,8 @@ public class PeerMessageConnection implements Closeable {
 	
 	private static final int CONNECT_RETRIES = 3;
 
+	public static final String NAME_THREAD_MESSAGE = "Thread-Message";
+	
 	public interface MessageConnectionListener {
 		void onConnectionFatalError(PeerMessageConnection connection, Exception reason);
 		void connected(PeerMessageConnection peerMessageConnection);
@@ -38,9 +42,10 @@ public class PeerMessageConnection implements Closeable {
 	private boolean mFromSocket;
 	private InetAddress mPeerAddress;
 	private int mPort;
+
 	private DirectMessager mMessager;
-	private MessageConnectionListener mConnectionErrorListener;
-	private PeerMessageConnection con;
+	private MessageConnectionListener mConnectionListener;
+	
 	private int mConnectionTimeout;
 
 	private DirectOperation mRequestOperation;
@@ -56,17 +61,18 @@ public class PeerMessageConnection implements Closeable {
 		mFromSocket = true;
 		mPeerAddress = mSocket.getInetAddress();
 		mPort = mSocket.getPort();
-		mConnectionErrorListener = listener;
+		mConnectionListener = listener;
 		
 		start( );
 	}
 	
 	public PeerMessageConnection( InetAddress peerAddress, int port,
 						   		  MessageConnectionListener listener ) {
+		
 		mPeerAddress = peerAddress;
 		mPort = port;
 		mFromSocket = false;
-		mConnectionErrorListener = listener;
+		mConnectionListener = listener;
 	}
 	
 	public void connect( int timeout ) throws IOException {
@@ -133,12 +139,17 @@ public class PeerMessageConnection implements Closeable {
 	
 	private void start( ) throws IOException {
 		if( mMessager != null ) {
-			throw new IllegalStateException( "Ther is a messager: " + mMessager );
+			throw new IllegalStateException( 
+						"There already has been a messager: " + mMessager );
 		}
 		
+		WifiP2pPeer peer
+			= WifiP2pGroupManager.getInstance()
+				.findPeerByAddress(mSocket.getInetAddress());
+	
 		InputStream in = mSocket.getInputStream();
 		OutputStream out = mSocket.getOutputStream();
-	    mMessager = new DirectMessager( in, out );
+	    mMessager = new DirectMessager( in, out, peer );
 
 		mMessageThread = new PeerMessageThread();
 		mMessageThread.start();
@@ -146,6 +157,7 @@ public class PeerMessageConnection implements Closeable {
 
 	@Override
 	public void close() {
+		Log.d( "The peer message connection is to be closed. ", this );
 		closeMessager();
 		
 		if( mSocket != null && mSocket.isConnected() ) {
@@ -201,6 +213,14 @@ public class PeerMessageConnection implements Closeable {
 			mRequestOperation = op;
 		}
 	}
+
+	public InetAddress getPeerInetAddress() {
+		return mPeerAddress;
+	}
+
+//	public TransferProgressor newProgressor(FileTransferInfo fti) {
+//		return mTransferProgressorFactory.newProgressor( fti );
+//	}
 	
 	@Override
 	public int hashCode() {
@@ -217,7 +237,7 @@ public class PeerMessageConnection implements Closeable {
 			return false;
 		}
 		
-		con = (PeerMessageConnection)obj;
+		PeerMessageConnection con = (PeerMessageConnection)obj;
 		return con.mPeerAddress.equals( mPeerAddress ) && con.mPort == mPort;
 	}
 
@@ -240,7 +260,7 @@ public class PeerMessageConnection implements Closeable {
 		private boolean mClosed;
 
 		private PeerMessageThread( ) throws IOException {
-			super( "Thread-Message" );
+			super( NAME_THREAD_MESSAGE );
 		}
 		
 		@Override
@@ -259,7 +279,8 @@ public class PeerMessageConnection implements Closeable {
 					if( op != null ) {
 						Log.d( "Operation received", op );
 						mState = STATE.REQUEST_DOING;
-						StatusOperation status = op.doOperation();
+						StatusOperation status
+							= op.doOperation( PeerMessageConnection.this );
 						Log.d( "Response is to be sent", status );
 						mState = STATE.RESPONSE_INIT;
 						mMessager.sendOperation(status);
@@ -278,7 +299,7 @@ public class PeerMessageConnection implements Closeable {
 					mClosed = true;
 				
 					Log.e(e, "The connection will be reset!" );
-					mConnectionErrorListener
+					mConnectionListener
 						.onConnectionFatalError( PeerMessageConnection.this, e );
 				} catch ( UnsupportedOperationException | BadPacketException e ) {
 					// Ignore this operation to continue for the next one
@@ -286,6 +307,12 @@ public class PeerMessageConnection implements Closeable {
 			}
 		}
 		
+		@Override
+		public void interrupt() {
+			new Exception().printStackTrace();
+			super.interrupt();
+		}
+
 		public void sendRequest() throws IOException {
 			try {
 				mState = STATE.REQUEST_SENDING;

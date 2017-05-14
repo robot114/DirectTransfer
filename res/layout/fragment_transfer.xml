@@ -4,8 +4,8 @@
     android:layout_height="match_parent"
     android:orientation="vertical" >
 
-	<ListView
-	    android:id="@+id/expandableTodoList"
+	<ExpandableListView
+	    android:id="@+id/progressList"
 	    android:layout_width="match_parent"
 	    android:layout_height="0dp"
 	    android:layout_margin="@dimen/defaultMargin"
@@ -14,6 +14,6 @@
 	    android:scrollbarStyle="insideOverlay"
 	    android:scrollbars="vertical|horizontal" >
 
-	</ListView>
+	</ExpandableListView>
 
 </LinearLayout>

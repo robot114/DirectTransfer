@@ -6,10 +6,10 @@ import java.util.Date;
 
 import android.content.Context;
 
-import com.zsm.android.ui.ExpandableListChildGroup;
+import com.zsm.android.ui.ExpandableTextListChildGroup;
 import com.zsm.directTransfer.R;
 
-public class ExpandableChileFileData implements ExpandableListChildGroup {
+public class ExpandableChileFileData implements ExpandableTextListChildGroup {
 
 	private final static int LABEL_RES_ID[] = new int[]{
 		R.string.labelDirectory, R.string.labelLastModified, R.string.labelSize

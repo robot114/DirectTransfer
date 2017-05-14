@@ -8,9 +8,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import android.content.Context;
-import android.widget.Toast;
 
-import com.zsm.directTransfer.R;
 import com.zsm.directTransfer.connection.PeerMessageConnection.MessageConnectionListener;
 import com.zsm.directTransfer.ui.StatusBarOperator;
 import com.zsm.log.Log;
@@ -52,7 +50,7 @@ public class MessageConnectionManager implements AutoCloseable {
 		mStarted = false;
 	}
 	
-	public void startMessageServer() {
+	public void startMessageServer() throws IOException {
 		if( mServerSocket != null && !mServerSocket.isClosed() ) {
 			throw new IllegalStateException(
 					"Message port has been listened: " + mServerSocket );
@@ -60,22 +58,13 @@ public class MessageConnectionManager implements AutoCloseable {
 		startListening();
 	}
 	
-	private void startListening() {
+	private void startListening() throws IOException {
 		if( mStarted ) {
 			return;
 		}
 		
-		try {
-			mServerSocket = new ServerSocket(MESSAGE_PORT);
-			Log.d( "Start to listen the message port ", MESSAGE_PORT );
-		} catch (IOException e) {
-			Log.e( e, "Cannot construct server" );
-			Toast.makeText( mContext,
-							R.string.promptFailToStartListening,
-						    Toast.LENGTH_LONG )
-				 .show();
-			return;
-		}
+		mServerSocket = new ServerSocket(MESSAGE_PORT);
+		Log.d( "Start to listen the message port ", MESSAGE_PORT );
 		
 		new Thread( "MessageListenerThread" ) {
 			@Override
@@ -125,7 +114,8 @@ public class MessageConnectionManager implements AutoCloseable {
 			public void run() {
 				PeerMessageConnection peerConnection
 					= new PeerMessageConnection( 
-							peerAddress, MESSAGE_PORT, mMessageConnectionListener );
+							peerAddress, MESSAGE_PORT,
+							mMessageConnectionListener );
 				
 			    try {
 			    	peerConnection.connect(BIND_REQUEST_TIMEOUT);
@@ -175,4 +165,11 @@ public class MessageConnectionManager implements AutoCloseable {
 		}
 	}
 	
+	synchronized public void closeAll() {
+		for( PeerMessageConnection pmc : mPeerMessageConnectionSet.values() ) {
+			pmc.close();
+		}
+		mPeerMessageConnectionSet.clear();
+		Log.d( "All the peer message connection closed!" );
+	}
 }

@@ -1,5 +1,8 @@
 package com.zsm.directTransfer.transfer.operation;
 
+import com.zsm.directTransfer.connection.PeerMessageConnection;
+import com.zsm.directTransfer.data.WifiP2pPeer;
+
 public class ReadFileOperation extends DirectFileOperation {
 
 	public ReadFileOperation() {
@@ -13,13 +16,13 @@ public class ReadFileOperation extends DirectFileOperation {
 	 * @param outputOneByOne true, output the file list as TYPE_ONE_FILE format;
 	 * 				false, as TYPE_FILE_LIST format
 	 */
-	public ReadFileOperation( FileInfo fi, boolean outputOneByOne ) {
+	public ReadFileOperation( FileTransferInfo fi, boolean outputOneByOne ) {
 		this(outputOneByOne);
 		
 		mFileList.add( fi );
 	}
 	
-	public ReadFileOperation( FileInfo fi ) {
+	public ReadFileOperation( FileTransferInfo fi ) {
 		this(fi, true);
 	}
 	
@@ -28,22 +31,22 @@ public class ReadFileOperation extends DirectFileOperation {
 	}
 
 	@Override
-	public void addArgument(byte type, int dataLen, byte[] data)
+	public void addArgument(byte type, int dataLen, byte[] data, WifiP2pPeer peer )
 					throws UnsupportedOperationException, BadPacketException {
 		if( mFileList.size() >= 1 ) {
 			throw new BadPacketException( 
 						"Only one file is allowed in a read operation" );
 		}
-		super.addArgument(type, dataLen, data);
+		super.addArgument(type, dataLen, data, peer);
 	}
 
 	@Override
-	public StatusOperation doOperation() {
+	public StatusOperation doOperation( PeerMessageConnection connection ) {
 		// TODO Auto-generated method stub
 		return null;
 	}
 
-	public FileInfo getFileInfo() {
+	public FileTransferInfo getFileInfo() {
 		return mFileList.get(0);
 	}
 

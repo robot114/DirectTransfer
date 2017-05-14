@@ -53,5 +53,8 @@
     <string name="statusFilePeer">Selected files are to be sent to %1$s</string>
     <string name="menuPeerAsReceiver">Peer as Receiver</string>
     <string name="menuPeerAsUploader">Peer as Uploader</string>
-    
+    <string name="transferProgressLeftTime">Time leaf: </string>
+    <string name="promptTransferCancelled">Cancelled</string>
+    <string name="promptTransferFailed">Failed</string>
+    <string name="promptWaitForPeerToConnect">Waiting for connecting the peer %1$s&#8230;</string>
 </resources>

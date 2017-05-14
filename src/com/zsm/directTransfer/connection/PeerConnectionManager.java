@@ -33,6 +33,10 @@ public class PeerConnectionManager implements AutoCloseable {
 	}
 
 	public static void initInstance( WifiP2pManager manager, Context context ) {
+		if( mInstance != null ) {
+			throw new IllegalStateException(
+						"PeerConnectionManager has been initialized!" );
+		}
 		mInstance = new PeerConnectionManager();
 		mInstance.mManager = manager;
 		mInstance.mContext = context;
@@ -69,8 +73,8 @@ public class PeerConnectionManager implements AutoCloseable {
 				= intent.getParcelableExtra( WifiP2pManager.EXTRA_NETWORK_INFO );
 			Log.d( "Wifi p2p connection broadcast received", ni );
 			if( ni.getState() == NetworkInfo.State.DISCONNECTED ) {
-				// TODO Record the socket and pass to closeTransferConnection
-				// when the TransferFragment supports more than one connection
+				// This device is disconnected from the group
+				MessageConnectionManager.getInstance().closeAll();
 			}
 			if( ni.isConnected() ) {
 				WifiP2pGroup group
@@ -87,7 +91,7 @@ public class PeerConnectionManager implements AutoCloseable {
 				}
 				Log.d( "P2p connected", group, info );
 				WifiP2pGroupManager.getInstance()
-					.updateGroup(group, info.groupOwnerAddress );
+					.updateGroup(group, info.groupOwnerAddress);
 			}
 		}
 	}

@@ -1,25 +1,38 @@
 package com.zsm.directTransfer.transfer;
 
-import com.zsm.directTransfer.transfer.operation.DirectFileOperation.FileInfo;
+import com.zsm.directTransfer.transfer.TransferTask.STATE;
+import com.zsm.directTransfer.transfer.operation.DirectFileOperation.FileTransferInfo;
 
 public interface TransferProgressor {
 	
-	interface Generator {
-
-		TransferProgressor newProgressor();
-		
+	public interface Factory {
+		TransferProgressor newProgressor( FileTransferInfo fti,
+										  OPERATION operation );
 	}
 	
 	public enum REASON {
 		FILE_NOT_FOUND, CANNOT_CREATE_FILE, IO_ERROR, CANCELLED,
-	};
+	}
 
-	void start(FileInfo mFileInfo);
+	public enum OPERATION { READ, WRITE };
+	
+	void start(FileTransferInfo fi);
 
-	void update(FileInfo fi, long current, long totalSize);
+	void update( FileTransferInfo fi, long current );
+	
+	void succeed(FileTransferInfo fi);
 
-	void succeed(FileInfo fi);
+	void failed(FileTransferInfo fi, REASON reason);
+	
+	long getTransferId();
 
-	void failed(FileInfo fi, REASON reason);
+	void updateState(STATE state);
 
+	void setTransferTask(TransferTask task);
+
+	void resumeTransferByPeer();
+	
+	void pauseTransferByPeer();
+
+	void cancelTransferByPeer();
 }
