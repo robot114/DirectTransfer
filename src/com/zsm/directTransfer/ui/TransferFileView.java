@@ -2,6 +2,7 @@ package com.zsm.directTransfer.ui;
 
 import com.zsm.directTransfer.R;
 import com.zsm.directTransfer.R.id;
+import com.zsm.directTransfer.transfer.TransferProgressor.OPERATION;
 
 import android.content.Context;
 import android.os.Handler;
@@ -30,14 +31,18 @@ public class TransferFileView extends LinearLayout {
 		mTargetView = (TextView)findViewById( id.textViewTarget );
 	}
 	
-	void setFileAndTarget( final String file, final String target ) {
+	void setFileAndTarget( final String file, final String target,
+						   final OPERATION operation ) {
+		
 		new Handler( Looper.getMainLooper() ).post( new Runnable () {
 			@Override
 			public void run() {
 				mFileView.setText(file);
-				mTargetView.setText(target);
+				int targetId
+					= operation == OPERATION.READ 
+						? R.string.labelFrom : R.string.labelTo;
+				mTargetView.setText(getContext().getText(targetId) + target);
 			}
 		});
 	}
-	
 }

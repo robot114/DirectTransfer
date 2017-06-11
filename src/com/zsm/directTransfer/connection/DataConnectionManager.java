@@ -73,15 +73,15 @@ public class DataConnectionManager implements AutoCloseable {
 		return new DataConnection( mServerSocket.accept() );
 	}
 
-	public void add(long serialNo, DataConnection dataConnection) {
-		mDataConnectionTable.put(serialNo, dataConnection);
+	public void add(long fileTransferId, DataConnection dataConnection) {
+		mDataConnectionTable.put(fileTransferId, dataConnection);
 	}
 
-	public DataConnection remove(long serialNo) {
-		return mDataConnectionTable.remove(serialNo);
+	public DataConnection remove(long fileTransferId) {
+		return mDataConnectionTable.remove(fileTransferId);
 	}
 
-	public DataConnection getConnection(long serialNo) {
-		return mDataConnectionTable.get(serialNo);
+	public DataConnection getConnection(long fileTransferId) {
+		return mDataConnectionTable.get(fileTransferId);
 	}
 }

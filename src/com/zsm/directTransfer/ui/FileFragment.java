@@ -31,6 +31,7 @@ import com.zsm.directTransfer.R;
 import com.zsm.directTransfer.data.WifiP2pPeer;
 import com.zsm.directTransfer.preferences.Preferences;
 import com.zsm.directTransfer.ui.data.ExpandableChileFileData;
+import com.zsm.util.file.FileUtilities;
 
 public class FileFragment extends Fragment
 				implements OnMenuItemClickListener, OnHandleFileListener {
@@ -110,7 +111,7 @@ public class FileFragment extends Fragment
 				addOnFileForGrant();
 				break;
 			case R.id.itemSearchFolder:
-				searchFolder();
+				searchFolderForGrant();
 				break;
 			case R.id.itemUpload:
 				upload();
@@ -156,9 +157,23 @@ public class FileFragment extends Fragment
 					});
 	}
 
-	private void searchFolder() {
-		// TODO Auto-generated method stub
-		
+	private void searchFolderForGrant() {
+		PermissionsManager.getInstance()
+			.requestPermissionsIfNecessaryForResult( 
+					this,
+					new String[]{ Manifest.permission.READ_EXTERNAL_STORAGE },
+					new PermissionsResultAction() {
+						@Override
+						public void onGranted() {
+							searchFolder();
+						}
+	
+						@Override
+						public void onDenied(String permission) {
+							promptReadStorageDenied();
+						}
+						
+					});
 	}
 
 	private void upload() {
@@ -225,17 +240,31 @@ public class FileFragment extends Fragment
 				mListAdapter.add( new ExpandableChileFileData( fileDir ), true );
 				break;
 			case FOLDER:
+				File[] files = fileDir.listFiles();
+				for( File f : files ) {
+					if( !f.isDirectory() && f.canRead() ) {
+						mListAdapter.add( new ExpandableChileFileData( f ), true );
+					}
+				}
+				break;
+			default:
 				break;
 		}
 		
 		Preferences.getInstance().setReadPath( fileDir.getAbsolutePath() );
-		// TODO Auto-generated method stub
-		
 	}
 
 	private void addOneFile() {
 		FileSelector fileSelector
 			= new FileSelector( getActivity(), FileOperation.LOAD,
+								Preferences.getInstance().getReadPath(), this,
+								null, true, true );
+		fileSelector.show();
+	}
+
+	protected void searchFolder() {
+		FileSelector fileSelector
+			= new FileSelector( getActivity(), FileOperation.FOLDER,
 								Preferences.getInstance().getReadPath(), this,
 								null, true, true );
 		fileSelector.show();

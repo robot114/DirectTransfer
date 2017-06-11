@@ -1,8 +1,5 @@
 package com.zsm.directTransfer.data;
 
-import java.net.InetAddress;
-import java.util.Random;
-
 import com.zsm.directTransfer.transfer.TransferProgressor;
 import com.zsm.directTransfer.transfer.operation.DirectFileOperation.FileTransferInfo;
 

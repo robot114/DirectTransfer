@@ -2,7 +2,6 @@ package com.zsm.directTransfer.ui;
 
 import com.zsm.directTransfer.transfer.TransferProgressor;
 import com.zsm.directTransfer.transfer.TransferTask;
-import com.zsm.directTransfer.transfer.TransferProgressor.OPERATION;
 import com.zsm.directTransfer.transfer.TransferTask.STATE;
 import com.zsm.directTransfer.transfer.operation.DirectFileOperation.FileTransferInfo;
 
@@ -17,7 +16,7 @@ public class TransferController implements TransferProgressor {
 	private OPERATION mOperation;
 	
 	private long mLastTime = 0;
-	private long mStartTime;
+	private long mStartTime = -1;
 	private long mCurrent = 0;
 
 	TransferController(FileTransferInfo f, OPERATION operation ) {
@@ -43,8 +42,6 @@ public class TransferController implements TransferProgressor {
 	@Override
 	public void start(FileTransferInfo fi) {
 		mFileInfo = fi;
-		mStartTime = System.currentTimeMillis();
-		
 		if( isVisible() ) {
 			updateFileView();
 		}
@@ -53,9 +50,10 @@ public class TransferController implements TransferProgressor {
 	private void updateFileView() {
 		if( mFileInfo != null ) {
 			mFileView.setFileAndTarget( mFileInfo.mFileName,
-										mFileInfo.getPeer().getUserDefinedName() );
+										mFileInfo.getPeer().getShowName(),
+										mOperation );
 		} else {
-			mFileView.setFileAndTarget( "", "" );
+			mFileView.setFileAndTarget( "", "", mOperation );
 		}
 	}
 
@@ -70,6 +68,9 @@ public class TransferController implements TransferProgressor {
 	public void update( FileTransferInfo fi, long current ) {
 		mCurrent = current;
 		long currentTime = System.currentTimeMillis();
+		if( mStartTime <= 0 ) {
+			mStartTime = currentTime;
+		}
 		if( isVisible() && currentTime - mLastTime > UPDATE_INTERVAL ) {
 			updateProgressView(fi, current, currentTime);
 		}

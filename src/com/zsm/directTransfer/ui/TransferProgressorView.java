@@ -10,6 +10,7 @@ import android.view.View;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
+import android.widget.SeekBar;
 import android.widget.TextView;
 
 import com.zsm.directTransfer.R;
@@ -21,7 +22,7 @@ import com.zsm.util.TextUtil;
 
 public class TransferProgressorView extends LinearLayout {
 
-	private ProgressBar mProgressorView;
+	private SeekBar mProgressorView;
 	private ImageView mStartPauseView;
 	private ImageView mStopView;
 	private TextView mProgressTextView;
@@ -41,7 +42,7 @@ public class TransferProgressorView extends LinearLayout {
 		LayoutInflater li
 			= (LayoutInflater)getContext().getSystemService( infService );
 		li.inflate( R.layout.item_transfer_progressor, this, true );
-		mProgressorView = (ProgressBar)findViewById( R.id.progressBar );
+		mProgressorView = (SeekBar)findViewById( R.id.progressBar );
 		mStartPauseView = (ImageView)findViewById( R.id.imageViewStartPause );
 		mStopView = (ImageView)findViewById( R.id.imageViewCancel );
 		mProgressTextView = (TextView)findViewById( R.id.textViewProgress );

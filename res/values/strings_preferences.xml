@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="prefKey_DownloadTarget">KEY_DOWNLOAD_TARGET</string>
+    <string name="prefTitle_DownloadTarget">Download Target Directory</string>
+    <string name="prefSummary_DownloadTarget">Directory to store the downloaded files: %s</string>
+    
+    <string name="prefKey_MaxTransferThread">KEY_MAX_TRANSFER_THREAD_NUM</string>
+    <string name="prefTitle_MaxTransferThread">Max Concurrent Download Thread</string>
+    <string name="prefSummary_MaxTransferThread">Max thread number to download at the same time: %s</string>
+</resources>

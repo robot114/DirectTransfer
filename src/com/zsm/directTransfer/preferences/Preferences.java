@@ -1,30 +1,33 @@
 package com.zsm.directTransfer.preferences;
 
 import java.io.File;
-import java.io.IOException;
 
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.SharedPreferences.OnSharedPreferenceChangeListener;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
+import android.net.Uri;
 import android.os.Environment;
 import android.preference.PreferenceManager;
+import android.widget.Toast;
 
+import com.zsm.directTransfer.R;
+import com.zsm.directTransfer.app.ApplicationInterface;
 import com.zsm.log.Log;
 
 public class Preferences {
+	private static final String DEFAULT_WRITE_PATH = "DirctTransfer";
 
-	private static final String KEY_WRITE_PATH = "KEY_WRITE_PATH";
+	private static final String KEY_USE_SAF = "KEY_USE_SAF";
+	private static final String KEY_READ_PATH = "KEY_READ_PATH";
+	private static String KEY_MAX_TRANSFER_THREAD_NUM;
+	static String KEY_WRITE_PATH;
 
 	private static final String PREFERENCES_BASE_NAME = "DirectTransferPreferences";
 
 	private static final int PREFRENCES_VERSION = 1;
 
-	private static final String KEY_READ_PATH = "KEY_READ_PATH";
-	private static final String KEY_MAX_TRANSFER_THREAD_NUM
-									= "KEY_MAX_TRANSFER_THREAD_NUM";
-	
 	static private Preferences instance;
 	final private SharedPreferences preferences;
 	
@@ -34,6 +37,7 @@ public class Preferences {
 
 	private SQLiteOpenHelper mSQLiteOpenHelper;
 	private PeerListDbOperator mPeerListOperator;
+	private int mPromptPickPathCount;
 	
 	private Preferences( Context context ) {
 		mContext = context;
@@ -52,9 +56,13 @@ public class Preferences {
 		instance = new Preferences( c );
 		instance.initInstance();
 		instance.stackTrace = Thread.currentThread().getStackTrace();
+		
+		KEY_WRITE_PATH = c.getString( R.string.prefKey_DownloadTarget );
+		KEY_MAX_TRANSFER_THREAD_NUM = c.getString( R.string.prefKey_MaxTransferThread );
 	}
 	
 	static public Preferences getInstance() {
+//		instance.preferences.edit().clear().commit();
 		return instance;
 	}
 	
@@ -111,19 +119,110 @@ public class Preferences {
 	}
 
 	public int getMaxTransferThreadNum() {
-		return preferences.getInt( KEY_MAX_TRANSFER_THREAD_NUM, 5 );
+		String numStr = preferences.getString(KEY_MAX_TRANSFER_THREAD_NUM, "5" );
+		return Integer.parseInt(numStr);
 	}
 
 	public String getWritePath() {
-		String defaultDir = Environment.getExternalStorageDirectory() + "/DirctTransfer";
-		File dir = new File ( preferences.getString( KEY_WRITE_PATH, defaultDir ) );
+		if( isStorageAsscessFramework() ) {
+			throw new UnsupportedOperationException(
+				"Cannot invoke this method when SAF set, "
+				+ "invoke getWriteUri instead" );
+		}
+		
+		String pathStr = preferences.getString( KEY_WRITE_PATH, null );
+		if( pathStr == null ) {
+			promptPickPath();
+			pathStr = defaultWritePath();
+		}
+		File dir = new File ( pathStr );
+		
 		boolean b = dir.mkdirs();
 		Log.d( "Create dir for download result.", b, dir );
 		
 		return dir.getAbsolutePath();
 	}
 
+	private String defaultWritePath() {
+		return Environment.getExternalStorageDirectory()
+					+ File.separator + DEFAULT_WRITE_PATH;
+	}
+
+	public void setWritePath( String path ) {
+		preferences
+			.edit()
+			.putString(KEY_WRITE_PATH, path)
+			.putBoolean( KEY_USE_SAF, false )
+			.commit();
+		
+		Log.d( "Download dir changed to ", getWritePath() );
+	}
+
+	public void setWriteUri(Uri uri) {
+		preferences
+			.edit()
+			.putString(KEY_WRITE_PATH, uri.toString())
+			.putBoolean( KEY_USE_SAF, true )
+			.commit();
+		
+		Log.d( "Download uri changed to ", getWriteUri() );
+	}
+	
+	public Uri getWriteUri() {
+		if( !ApplicationInterface.isSafSystem() ) {
+			throw new UnsupportedOperationException(
+				"Version of the system does not support Storage Access Framework!" );
+		}
+		
+		String uriStr = preferences.getString( KEY_WRITE_PATH, null );
+		if( uriStr == null || !preferences.getBoolean( KEY_USE_SAF, false ) ) {
+			throw new UnsupportedOperationException( "Write path has not picked by SAF!" );
+		}
+		Uri uri = Uri.parse(uriStr);
+//		Uri docUri = DocumentsContract.buildChildDocumentsUriUsingTree(uri, DocumentsContract.getTreeDocumentId(uri));
+//		Cursor cursorRoot
+//			= mContext.getContentResolver().query(docUri, null, null, null, null);
+//		if( cursorRoot != null && cursorRoot.moveToFirst() ) {
+//			String[] columnNames = cursorRoot.getColumnNames();
+//			Log.d( "Columns: ", Arrays.toString( columnNames ) );
+//			Log.d( "Result num: ", cursorRoot.getCount() );
+//			do {
+//				for( int i = 0; i < columnNames.length; i++ ) {
+//					System.out.print( columnNames[i] + "[" );
+//					if( cursorRoot.getType(i) == Cursor.FIELD_TYPE_STRING) {
+//						System.out.print( cursorRoot.getString( i ) + "], ");
+//					} else {
+//						System.out.print( cursorRoot.getInt( i ) + "], ");
+//					}
+//				}
+//				System.out.println();
+//			} while( cursorRoot.moveToNext() );
+//		} else {
+//			Log.d( "Nothing queried!" );
+//		}
+		return uri;
+	}
+
+	private void promptPickPath() {
+		if( mPromptPickPathCount == 0 ) {
+			String text
+				= mContext.getString( R.string.promptPickWritePath,
+									  mContext.getString( 
+										R.string.prefTitle_DownloadTarget ),
+									  defaultWritePath() );
+			Toast.makeText(mContext, text, Toast.LENGTH_LONG ).show();
+			mPromptPickPathCount = 10;
+		}
+		
+		mPromptPickPathCount--;
+	}
+
+	public boolean isStorageAsscessFramework() {
+		return preferences.getBoolean( KEY_USE_SAF, false );
+	}
+	
 	public boolean isAppend() {
 		return preferences.getBoolean( "KEY_APPEND", false );
 	}
+
 }

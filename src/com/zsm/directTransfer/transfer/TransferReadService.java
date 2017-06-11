@@ -11,7 +11,18 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.Semaphore;
 
+import android.Manifest;
+import android.app.Activity;
+import android.content.ContentResolver;
+import android.database.Cursor;
+import android.net.Uri;
+import android.provider.DocumentsContract;
+import android.widget.Toast;
+
+import com.anthonycr.grant.PermissionsManager;
+import com.anthonycr.grant.PermissionsResultAction;
 import com.zsm.directTransfer.connection.DataConnectionManager;
 import com.zsm.directTransfer.data.FileTransferObject;
 import com.zsm.directTransfer.preferences.Preferences;
@@ -21,13 +32,21 @@ import com.zsm.log.Log;
 
 public class TransferReadService implements Runnable, AutoCloseable {
 
+	private static final String[] DOCUMENT_COLUMNS
+		= new String[]{ DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+						DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+						DocumentsContract.Document.COLUMN_SIZE };
+	
 	private static TransferReadService mInstance;
 	
 	private final BlockingQueue<FileTransferObject> mQueue;
 	private final ExecutorService mPool;
 	private boolean mClosed;
 
-	private TransferReadService() {
+	private Activity mActivity;
+
+	private TransferReadService( Activity ui ) {
+		mActivity = ui;
 		mQueue = new LinkedBlockingQueue<FileTransferObject>();
 		mPool = Executors.newFixedThreadPool(
 					Preferences.getInstance().getMaxTransferThreadNum() );
@@ -35,13 +54,13 @@ public class TransferReadService implements Runnable, AutoCloseable {
 		mClosed = false;
 	}
 	
-	public static void start() {
+	public static void start(Activity ui) {
 		if( mInstance != null ) {
 			throw new IllegalStateException( 
 						"TransferReadService has been started!" );
 		}
-		mInstance = new TransferReadService( );
-		new Thread( mInstance ).start();
+		mInstance = new TransferReadService( ui );
+		new Thread( mInstance, "ReadService" ).start();
 	}
 	
 	public static TransferReadService getInstance() {
@@ -54,17 +73,26 @@ public class TransferReadService implements Runnable, AutoCloseable {
 		p.start(fti);
 		FileTransferObject fto = new FileTransferObject(fti, p);
 		mQueue.put( fto );
+		Log.d( "FileTransferInfo put in the queue: ", fti );
 	}
 
 	@Override
 	public void run() {
+		doReadTransfer();
+	}
+
+	private void doReadTransfer() {
 		while( !mClosed ) {
 			try {
 				FileTransferObject tf = mQueue.take();
+				Log.d( "FileTransferInfo taken from the queue, and to be executed: ",
+						tf.getFileTransferInfo() );
+				
 				mPool.execute( new ReadTask( tf.getFileTransferInfo(),
 											 tf.getProgressor() ) );
+				Thread.sleep( 300 );
 			} catch (InterruptedException e) {
-			} finally {
+				Log.e( e, "Read service is interrupted" );
 				close();
 			}
 		}
@@ -72,7 +100,7 @@ public class TransferReadService implements Runnable, AutoCloseable {
 
 	@Override
 	public void close() {
-		Log.d( "Read is to be closed." );
+		Log.d( "Read service is to be closed." );
 		mClosed = true;
 		mQueue.clear();
 		mPool.shutdown();
@@ -90,6 +118,9 @@ public class TransferReadService implements Runnable, AutoCloseable {
 	
 	class ReadTask extends TransferTask implements Runnable, Closeable {
 
+		private Semaphore mGrantSemaphore = new Semaphore( 0 );
+		private boolean mGranted = false;
+		
 		private OutputStream mOutputStream;
 		
 		private ReadTask( FileTransferInfo fti, TransferProgressor p ) {
@@ -101,6 +132,42 @@ public class TransferReadService implements Runnable, AutoCloseable {
 		
 		@Override
 		public void run() {
+			PermissionsManager.getInstance().requestPermissionsIfNecessaryForResult( 
+				mActivity,
+				new String[]{ Manifest.permission.WRITE_EXTERNAL_STORAGE },
+				new PermissionsResultAction() {
+					@Override
+					public void onGranted() {
+						// This method will be invoked in the main thread.
+						// So only the result is recorded, and the resume the read task
+						mGranted = true;
+						mGrantSemaphore.release();
+					}
+
+					@Override
+					public void onDenied(String permission) {
+						// TODO: resid
+						Toast.makeText(mActivity,
+									  "Permission denied for writing to file",
+									  Toast.LENGTH_SHORT)
+							 .show();
+						mGranted = false;
+						mGrantSemaphore.release();
+					}
+					
+				});
+			
+			if( mGranted ) {
+				try {
+					mGrantSemaphore.acquire();
+					readForGrant();
+				} catch (InterruptedException e) {
+					Log.e( e, "GrantSemaphore is interrupted!" );
+				}
+			}
+		}
+
+		private void readForGrant() {
 			try {
 				read();
 				mProgressor.succeed( mFileTraqnsferInfo );
@@ -136,7 +203,7 @@ public class TransferReadService implements Runnable, AutoCloseable {
 			mConnection.setTransferTask( this );
 			mConnection.sendRequestOperation( mFileTraqnsferInfo );
 			int len = 0;
-			byte[] buffer = new byte[2048];
+			byte[] buffer = new byte[4096];
 			long totalLen 
 				= mFileTraqnsferInfo.getStartPosition() > 0
 					? mFileTraqnsferInfo.getStartPosition() : 0;
@@ -149,15 +216,65 @@ public class TransferReadService implements Runnable, AutoCloseable {
 				mOutputStream.write(buffer, 0, len);
 				totalLen += len;
 				mProgressor.update( mFileTraqnsferInfo, totalLen );
-				// Do not know who interrupts and why. So do not invoke sleep
-//				Thread.sleep( 100 );
 				if( getState() == STATE.CANCELLED ) {
 					throw new InterruptedException( "Stopped by user!" );
 				}
 			}
 		}
 
-		private OutputStream openOutputStream() throws FileNotFoundException {
+		private OutputStream openOutputStream() throws IOException {
+			if( Preferences.getInstance().isStorageAsscessFramework() ) {
+				return openOutputStreamSAF();
+			} else {
+				return openOutputStreamFileSystem();
+			}
+		}
+
+		private OutputStream openOutputStreamSAF() throws FileNotFoundException {
+			Uri fileUri = getLocalFileUri();
+			ContentResolver cr = mActivity.getContentResolver();
+			Cursor c = cr.query(fileUri, DOCUMENT_COLUMNS, null, null, null);
+			OutputStream os;
+			if( c != null && c.moveToFirst() ) {
+				boolean append = Preferences.getInstance().isAppend();
+				long size
+					= c.getLong( c.getColumnIndex( 
+									DocumentsContract.Document.COLUMN_SIZE ) );
+				
+				mFileTraqnsferInfo.setStartPosition( size );
+				String mode = append ? "wa" : "w";
+				os = cr.openOutputStream(fileUri, mode );
+				
+				Log.d( "File exists and get its OutputStream.",
+					   "uri", fileUri, "append", append, "size", size );
+			} else {
+				Uri writeTreeUri = Preferences.getInstance().getWriteUri();
+				Uri dirUri
+					= DocumentsContract.buildDocumentUriUsingTree(
+							writeTreeUri,
+							DocumentsContract.getTreeDocumentId(writeTreeUri));
+				
+				Uri newFileUri
+					= DocumentsContract.createDocument(
+						cr, dirUri,
+						"application/octet-stream", getFileName() );
+				if( newFileUri == null ) {
+					throw new FileNotFoundException( "Create the file failed: " + fileUri );
+				}
+				os = cr.openOutputStream(newFileUri );
+				Log.d( "New file created", newFileUri );
+			}
+			return os;
+		}
+
+		private Uri getLocalFileUri() {
+			String fn = getFileName();
+			Uri treeUri = Preferences.getInstance().getWriteUri();
+			return DocumentsContract.buildDocumentUriUsingTree(treeUri, fn);
+		}
+
+		private OutputStream openOutputStreamFileSystem() throws FileNotFoundException {
+			
 			File file = new File( getLocalFileName() );
 			
 			boolean append
@@ -168,18 +285,23 @@ public class TransferReadService implements Runnable, AutoCloseable {
 				mFileTraqnsferInfo.setStartPosition( file.length() );
 			}
 			
-			Log.d( "File to store.", file );
+			Log.d( "File to store: ", file );
 			return new FileOutputStream( file, append );
 		}
 
 		private String getLocalFileName() {
+			String fn = getFileName();
+			return Preferences.getInstance().getWritePath() + File.separator + fn;
+		}
+
+		private String getFileName() {
 			int separatorIndex
 				= mFileTraqnsferInfo.getFilePathName().lastIndexOf( File.separator );
 			String fn = mFileTraqnsferInfo.getFilePathName();
 			if( separatorIndex > 0 ) {
 				fn = fn.substring( separatorIndex + 1 );
 			}
-			return Preferences.getInstance().getWritePath() + File.separator + fn;
+			return fn;
 		}
 
 		@Override
@@ -199,6 +321,8 @@ public class TransferReadService implements Runnable, AutoCloseable {
 				mConnection.close();
 			}
 			mConnection = null;
+			
+			mGrantSemaphore.release();
 		}
 
 		@Override

@@ -14,7 +14,7 @@ public class StatusOperation extends DirectOperation {
 	// |OPCODE(0)|type(TYPE_STATUS)|length(1)|value|...		|
 	// +----------------------------------------------------+
 	static final byte TYPE_STATUS = 0;
-	static final int LENGTH_STATUS = 1;
+	static final short LENGTH_STATUS = 1;
 	static final byte VALUE_STATUS_OK = 0;
 	static final byte VALUE_STATUS_NO_RESPONSE = 1;
 	static final byte VALUE_STATUS_NOT_SUPPORTED = 2;
@@ -66,14 +66,18 @@ public class StatusOperation extends DirectOperation {
 							+ dataLen );
 				}
 				mStatus = data[0];
+				Log.d( "Status is ", mStatus );
 				break;
 			case TYPE_REASON:
 				try {
-					mReason = new String( data, DirectMessager.READABLE_ENCODE );
+					mReason
+						= new String( data, 0, dataLen,
+									  DirectMessager.READABLE_ENCODE );
 				} catch (UnsupportedEncodingException e) {
 					Log.w( e, "Unsupported encodeing",
 							DirectMessager.READABLE_ENCODE );
 				}
+				Log.d( "Reason is ", mReason );
 				break;
 			default:
 				Log.d( "Unsupported arg type", type );
@@ -83,17 +87,18 @@ public class StatusOperation extends DirectOperation {
 	@Override
 	public StatusOperation doOperation( PeerMessageConnection connection ) {
 		// Should not be invoked
-		return null;
+		throw new IllegalStateException( 
+					"doOperation should not be invoked for StatusOperation!" );
 	}
 
 	@Override
 	void outputOperation(DataOutputStream out) throws IOException {
-		out.write( TYPE_STATUS );
-		out.write( LENGTH_STATUS );
-		out.write( mStatus );
+		out.writeByte( TYPE_STATUS );
+		out.writeShort( LENGTH_STATUS );
+		out.writeByte( mStatus );
 		
 		if( mReason != null ) {
-			out.write( TYPE_REASON );
+			out.writeByte( TYPE_REASON );
 			byte[] b = mReason.getBytes( DirectMessager.READABLE_ENCODE );
 			out.writeShort( b.length );
 			out.write( b );

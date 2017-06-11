@@ -281,10 +281,10 @@ public class PeerMessageConnection implements Closeable {
 						mState = STATE.REQUEST_DOING;
 						StatusOperation status
 							= op.doOperation( PeerMessageConnection.this );
-						Log.d( "Response is to be sent", status );
+						Log.d( "Response is to be sent: ", status );
 						mState = STATE.RESPONSE_INIT;
 						mMessager.sendOperation(status);
-						Log.d( "Response sent", status );
+						Log.d( "Response sent: ", status );
 						mState = STATE.RESPONSE_SENT;
 					}
 					sleep( 100 );
@@ -307,12 +307,6 @@ public class PeerMessageConnection implements Closeable {
 			}
 		}
 		
-		@Override
-		public void interrupt() {
-			new Exception().printStackTrace();
-			super.interrupt();
-		}
-
 		public void sendRequest() throws IOException {
 			try {
 				mState = STATE.REQUEST_SENDING;

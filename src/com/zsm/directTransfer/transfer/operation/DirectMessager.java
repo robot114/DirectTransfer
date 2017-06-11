@@ -150,7 +150,7 @@ public class DirectMessager implements Closeable {
 		try {
 			op = (DirectOperation) OPCODE_ARRAY[opCode].newInstance();
 			op.setSerialNo( sn );
-			Log.d("Operation received, opcode: ", opCode);
+			Log.d("Operation received, opcode: ", opCode, "total len of operation", totalLen);
 		} catch (InstantiationException | IllegalAccessException e) {
 			Log.w(e, "Cannot new instance operation", "opCode", opCode);
 			mInputStream.skip(totalLen);
@@ -176,9 +176,9 @@ public class DirectMessager implements Closeable {
 			totalLen -= len;
 
 			if (argLen > totalLen) {
-				mInputStream.skip(totalLen);
 				BadPacketException e = new BadPacketException(
-						"Argument length longer than the buffer left!");
+						"Argument length(" + argLen + ") longer than the buffer("
+						+ totalLen + ") left!");
 				Log.e(e);
 				throw e;
 			}
@@ -247,10 +247,11 @@ public class DirectMessager implements Closeable {
 			= LENGTH_VER + LENGTH_OPCODE + LENGTH_SERIAL_NO
 				+ op.calcTotalArgumentsLength();
 		
-		dos.write( (byte)(totalLen>>8) );
-		dos.write( (byte)totalLen );
-		dos.write( VALUE_VER );
+		dos.writeByte( (byte)(totalLen>>8) );
+		dos.writeByte( (byte)totalLen );
+		dos.writeByte( VALUE_VER );
 		dos.writeLong( op.getSerialNo() );
+		dos.writeByte( op.getOpCode() );
 		op.outputOperation( dos );
 		
 		dos.flush();

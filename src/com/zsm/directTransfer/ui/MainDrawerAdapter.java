@@ -13,27 +13,34 @@ public class MainDrawerAdapter extends BaseAdapter {
 	
 	public static final int TRANSFER_ITEM_POSITION = 0;
 	public static final int PEER_ITEM_POSITION = 1;
+	public static final int SETTING_ITEM_POSITION = 2;
 	
-	public static final int END_OF_POSITION = 2;
+	public static final int END_OF_POSITION = 3;
 	
 	private final static int[] ITEM_LAYOUT_ID = {
 		R.layout.drawer_simple_item,	// TRANSFER_ITEM_POSITION
-		R.layout.drawer_simple_item		// NEW_PEER_ITEM_POSITION
+		R.layout.drawer_simple_item,	// NEW_PEER_ITEM_POSITION
+		R.layout.drawer_simple_item		// SETTING_ITEM_POSITION
 	};
 	
 	private final static int[] ITEM_DRAWABLE_ID = {
 		R.drawable.transfer,
-		R.drawable.discover
+		R.drawable.discover,
+		R.drawable.setting
 	};
 	
 	private final static int[] ITEM_TEXT_ID = {
 		R.string.titleTransfer,
-		R.string.titleDiscover
+		R.string.titleDiscover,
+		R.string.titleSetting
 	};
 	
+	private Context mContext;
 	private View[] mItemViews;
 
 	MainDrawerAdapter( Context context ) {
+		mContext = context;
+		
 		mItemViews = new View[ITEM_LAYOUT_ID.length];
 		
 		LayoutInflater li
@@ -51,19 +58,16 @@ public class MainDrawerAdapter extends BaseAdapter {
 	
 	@Override
 	public int getCount() {
-		// TODO Auto-generated method stub
 		return ITEM_LAYOUT_ID.length;
 	}
 
 	@Override
 	public Object getItem(int position) {
-		// TODO Auto-generated method stub
-		return "Add peer";
+		return mContext.getString( ITEM_TEXT_ID[position] );
 	}
 
 	@Override
 	public long getItemId(int position) {
-		// TODO Auto-generated method stub
 		return 0;
 	}
 

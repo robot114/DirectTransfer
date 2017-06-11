@@ -96,11 +96,11 @@ public class FileTransferActionOperation extends DirectOperation {
 
 	@Override
 	void outputOperation(DataOutputStream out) throws IOException {
-		out.write( TYPE_TRANSFER_ACTION );
-		out.write( LEN_ACTION );
-		out.write( mOperation );
-		out.write( TYPE_TRANSFER_ID );
-		out.write( DirectMessager.LENGTH_SERIAL_NO );
+		out.writeByte( TYPE_TRANSFER_ACTION );
+		out.writeShort( LEN_ACTION );
+		out.writeByte( mOperation );
+		out.writeByte( TYPE_TRANSFER_ID );
+		out.writeShort( DirectMessager.LENGTH_SERIAL_NO );
 		out.writeLong( mTransferId );
 	}
 }

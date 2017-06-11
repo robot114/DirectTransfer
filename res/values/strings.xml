@@ -14,6 +14,7 @@
     <string name="labelLastModified">Modified: </string>
     <string name="titleTransfer">Transfer</string>
     <string name="titleDiscover">Discover Peers</string>
+    <string name="titleSetting">Settings</string>
     <string name="titleFile">Select Files to Transfer</string>
     <string name="titleDialogEnterPeerName">Enter Peer\'s Name</string><string name="titleDialogRemoveFromPersistence">Remove</string>
     <string name="promptEnableWifi">WiFi is going to be enabled. Are you sure?</string>
@@ -57,4 +58,7 @@
     <string name="promptTransferCancelled">Cancelled</string>
     <string name="promptTransferFailed">Failed</string>
     <string name="promptWaitForPeerToConnect">Waiting for connecting the peer %1$s&#8230;</string>
+    <string name="labelFrom">From: </string>
+    <string name="labelTo">To: </string>
+    <string name="promptPickWritePath">Pick the download path with Setting->%1$s. Default download path \"%2$s\" will be used.</string>
 </resources>

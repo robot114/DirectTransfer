@@ -4,7 +4,9 @@ import com.zsm.driver.android.log.LogInstaller;
 import com.zsm.driver.android.log.LogPreferences;
 import com.zsm.log.Log;
 import com.zsm.log.SystemOutLog;
+
 import android.annotation.SuppressLint;
+import android.app.Activity;
 import android.app.Application;
 import android.os.Build;
 
@@ -12,6 +14,7 @@ import android.os.Build;
 public class DirectTransferApplication extends Application {
 
 	private static final String LOG_TAG = "DirectTransfer";
+	private Activity mMainActivity;
 
 	public DirectTransferApplication() {
 		super();
@@ -33,5 +36,13 @@ public class DirectTransferApplication extends Application {
 		Log.setGlobalLevel( Log.LEVEL.DEBUG );
 		
 		Preferences.init(getApplicationContext());
+	}
+	
+	public void setMainActivity( Activity mainActivity ) {
+		mMainActivity = mainActivity;
+	}
+	
+	public Activity getMainActivity() {
+		return mMainActivity;
 	}
 }

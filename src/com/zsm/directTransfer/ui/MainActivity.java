@@ -13,8 +13,7 @@ import android.app.FragmentManager;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.DialogInterface;
-import android.content.DialogInterface.OnCancelListener;
-import android.content.DialogInterface.OnClickListener;
+import android.content.DialogInterface.OnDismissListener;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.net.wifi.p2p.WifiP2pDevice;
@@ -28,12 +27,14 @@ import android.view.MenuItem;
 import android.widget.Toast;
 
 import com.zsm.directTransfer.R;
+import com.zsm.directTransfer.app.DirectTransferApplication;
 import com.zsm.directTransfer.connection.DataConnectionManager;
 import com.zsm.directTransfer.connection.MessageConnectionManager;
 import com.zsm.directTransfer.connection.PeerConnectionManager;
 import com.zsm.directTransfer.connection.PeerMessageConnection;
 import com.zsm.directTransfer.connection.PeerMessageConnection.MessageConnectionListener;
 import com.zsm.directTransfer.data.WifiP2pPeer;
+import com.zsm.directTransfer.preferences.MainPreferencesFragment;
 import com.zsm.directTransfer.transfer.TransferProgressorManager;
 import com.zsm.directTransfer.transfer.TransferReadService;
 import com.zsm.directTransfer.transfer.TransferWriteService;
@@ -50,7 +51,9 @@ public class MainActivity extends Activity implements
 	final static int FRAGMENT_FILE_POSITION = MainDrawerAdapter.END_OF_POSITION;
 	
 	static final private int[] TITLE_RES_ID
-		= new int[]{ R.string.titleTransfer, R.string.titleDiscover,
+		= new int[]{ R.string.titleTransfer,
+					 R.string.titleDiscover,
+					 R.string.titleSetting,
 					 R.string.titleFile };
 	/**
 	 * Fragment managing the behaviors, interactions and presentation of the
@@ -103,6 +106,9 @@ public class MainActivity extends Activity implements
 		mFragment[MainDrawerAdapter.PEER_ITEM_POSITION] = pf;
 		pf.registerPeerSelectionObserver(mPeerSelectionObserver);
 		
+		mFragment[MainDrawerAdapter.SETTING_ITEM_POSITION]
+				= new MainPreferencesFragment();
+		
 		FileFragment ff = new FileFragment(this, this, mStatusBarFragment);
 		mFragment[FRAGMENT_FILE_POSITION] = ff;
 	}
@@ -110,6 +116,8 @@ public class MainActivity extends Activity implements
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
+		
+		((DirectTransferApplication)getApplication()).setMainActivity( this );
 		
 	    mManager
 	    	= (WifiP2pManager) getSystemService(Context.WIFI_P2P_SERVICE);
@@ -138,6 +146,7 @@ public class MainActivity extends Activity implements
 		mNavigationDrawerFragment.setUp(R.id.navigation_drawer,
 				(DrawerLayout) findViewById(R.id.drawer_layout));
 
+		toFragment( MainDrawerAdapter.PEER_ITEM_POSITION );
 		mMyselfWifiP2pReceiver = new BroadcastReceiver() {
 			@Override
 			public void onReceive(Context context, Intent intent) {
@@ -182,7 +191,7 @@ public class MainActivity extends Activity implements
 	}
 	
 	private void initTransferService() {
-		TransferReadService.start();
+		TransferReadService.start( this );
 		TransferWriteService.start();
 	}
 
@@ -268,7 +277,7 @@ public class MainActivity extends Activity implements
 				
 				while( pmc == null ) {
 					try {
-						wait( 500 );
+						Thread.sleep( 500 );
 					} catch (InterruptedException e) {
 						// May be cancelled by the user
 						Log.d( "Thread wait for peer connection is interrupted!" );
@@ -296,12 +305,11 @@ public class MainActivity extends Activity implements
 		mWaitPeerConnectionThread.start();
 		
 		mWaitingForPeerConnectionDialog
-			= getWaitingForPeerConnectionDialog(peer, mWaitPeerConnectionThread );
+			= getWaitingForPeerConnectionDialog(peer);
 		mWaitingForPeerConnectionDialog.show();
 	}
 	
-	private AlertDialog getWaitingForPeerConnectionDialog( 
-				final WifiP2pPeer peer, final Thread thread ) {
+	private AlertDialog getWaitingForPeerConnectionDialog( final WifiP2pPeer peer ) {
 		
 		String message
 			= getString( R.string.promptWaitForPeerToConnect,
@@ -310,12 +318,14 @@ public class MainActivity extends Activity implements
 			= new AlertDialog.Builder(this)
 					.setMessage(message)
 					.setCancelable(true)
-					.setOnCancelListener(new OnCancelListener () {
+					.setOnDismissListener(new OnDismissListener() {
 						@Override
-						public void onCancel(DialogInterface dialog) {
-							mWaitPeerConnectionThread = null;
+						public void onDismiss(DialogInterface dialog) {
+							if( mWaitPeerConnectionThread != null ) {
+								mWaitPeerConnectionThread.interrupt();
+								mWaitPeerConnectionThread = null;
+							}
 							mWaitingForPeerConnectionDialog = null;
-							thread.interrupt();
 						}
 					})
 					.setNegativeButton( android.R.string.cancel, null )

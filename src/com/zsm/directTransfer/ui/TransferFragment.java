@@ -19,7 +19,9 @@ import com.zsm.directTransfer.R;
 import com.zsm.directTransfer.data.FileTransferObject;
 import com.zsm.directTransfer.transfer.TransferProgressor;
 import com.zsm.directTransfer.transfer.TransferProgressor.OPERATION;
+import com.zsm.directTransfer.transfer.TransferProgressorManager;
 import com.zsm.directTransfer.transfer.operation.DirectFileOperation.FileTransferInfo;
+import com.zsm.log.Log;
 
 public class TransferFragment extends Fragment implements TransferProgressor.Factory {
 
@@ -59,7 +61,10 @@ public class TransferFragment extends Fragment implements TransferProgressor.Fac
 	public void addTransferOperation( final List<FileTransferInfo> fis ) {
 		for( FileTransferInfo fi : fis ) {
 			// Send a file write operation, so the progressor should be writing one
-			final TransferProgressor p = newProgressor( fi, OPERATION.WRITE );
+			final TransferProgressor p
+				= TransferProgressorManager.getInstance()
+					.newProgressor( fi, OPERATION.WRITE );
+			
 			FileTransferObject fto = new FileTransferObject( fi, p );
 			
 			mFileTransferObjectList.put( fto.getFileTransferId(), fto );
@@ -71,12 +76,15 @@ public class TransferFragment extends Fragment implements TransferProgressor.Fac
 	}
 
 	@Override
-	public TransferProgressor newProgressor(FileTransferInfo fti, OPERATION operation) {
+	public TransferProgressor newProgressor(final FileTransferInfo fti,
+											final OPERATION operation) {
+		
 		final TransferController p = new TransferController( fti, operation );
 		new Handler(Looper.getMainLooper()).post( new Runnable() {
 			@Override
 			public void run() {
 				mProgressListAdapter.add(p);
+				Log.d( "Transfer controller added: ", p, "FileTransferInfo", fti );
 				mProgressList.expandGroup( mProgressListAdapter.getGroupCount() - 1 );
 			}
 		});

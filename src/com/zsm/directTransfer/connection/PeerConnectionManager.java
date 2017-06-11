@@ -74,7 +74,7 @@ public class PeerConnectionManager implements AutoCloseable {
 			Log.d( "Wifi p2p connection broadcast received", ni );
 			if( ni.getState() == NetworkInfo.State.DISCONNECTED ) {
 				// This device is disconnected from the group
-				MessageConnectionManager.getInstance().closeAll();
+//				MessageConnectionManager.getInstance().closeAll();
 			}
 			if( ni.isConnected() ) {
 				WifiP2pGroup group

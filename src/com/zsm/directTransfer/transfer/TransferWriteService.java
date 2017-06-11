@@ -41,7 +41,7 @@ public class TransferWriteService implements Runnable, AutoCloseable {
 						"TransferWriteService has been started!" );
 		}
 		mInstance = new TransferWriteService( );
-		new Thread( mInstance ).start();
+		new Thread( mInstance, "WriteService" ).start();
 	}
 	
 	@Override
@@ -146,13 +146,13 @@ public class TransferWriteService implements Runnable, AutoCloseable {
 						"Should be read file opcode. OpCode is " + opCode );
 			}
 			ReadFileOperation rfo = (ReadFileOperation)op;
+			mFileTraqnsferInfo = rfo.getFileInfo();
 			mProgressor
 				= TransferProgressorManager.getInstance()
 					.getByTransferId( mFileTraqnsferInfo.getId() );
 			
 			mProgressor.setTransferTask( this );
 
-			mFileTraqnsferInfo = rfo.getFileInfo();
 			File file = new File( mFileTraqnsferInfo.getFilePathName() );
 			mProgressor.start(mFileTraqnsferInfo);
 			FileInputStream fis = null;
@@ -165,7 +165,7 @@ public class TransferWriteService implements Runnable, AutoCloseable {
 					totalLen = startPosition;
 				}
 				int len = 0;
-				byte[] buffer = new byte[2048];
+				byte[] buffer = new byte[4096];
 				setState( STATE.STARTED );
 				while( ( len = fis.read( buffer  ) ) > 0 ) {
 					totalLen = doWrite(totalLen, len, buffer);

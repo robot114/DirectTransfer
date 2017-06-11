@@ -26,6 +26,8 @@ public abstract class DirectFileOperation extends DirectOperation {
 	static final byte LENGTH_FILE_SIZE = 8;
 	static final byte LENGTH_TRANSFER_ID_SIZE = 8;
 
+	private static final Random ID_RANDOM = new Random(System.currentTimeMillis());
+	
 	protected List<FileTransferInfo> mFileList;
 	protected boolean mOutputOneByOne;
 	
@@ -71,13 +73,11 @@ public abstract class DirectFileOperation extends DirectOperation {
 
 	@Override
 	protected void outputOperation(DataOutputStream out) throws IOException {
-		out.write( getOpCode() );
-		
 		if( mOutputOneByOne ) {
 			for( FileTransferInfo fi : mFileList ) {
 				byte[] fileNameBytes
 					= fi.getFilePathName().getBytes( DirectMessager.READABLE_ENCODE );
-				out.write( TYPE_ONE_FILE );
+				out.writeByte( TYPE_ONE_FILE );
 				
 				int len
 					= LENGTH_TRANSFER_ID_SIZE + LENGTH_FILE_SIZE
@@ -193,7 +193,9 @@ public abstract class DirectFileOperation extends DirectOperation {
 		 * @param peer peer of the transfer
 		 */
 		protected FileTransferInfo( File file, WifiP2pPeer peer ) {
-			mId = new Random(System.currentTimeMillis()).nextLong();
+			synchronized( ID_RANDOM ) {
+				mId = ID_RANDOM.nextLong();
+			}
 			
 			mFilePathName = file.getPath();
 			mFileName = file.getName();
@@ -206,6 +208,8 @@ public abstract class DirectFileOperation extends DirectOperation {
 		public String toString() {
 			StringBuffer buff = new StringBuffer();
 			buff.append( mFilePathName )
+				.append( ", gtransferId: " )
+				.append( mId )
 				.append( ", size: " )
 				.append( mSize )
 				.append( ", startFrom: " )

@@ -24,7 +24,7 @@ public class DataConnection implements AutoCloseable {
 	private InputStream mInputStream;
 	private OutputStream mOutputStream;
 	private DirectMessager mMessager;
-	private DirectOperation mOperation;
+	private ReadFileOperation mOperation;
 	private TransferTask mTransferTask;
 
 	DataConnection( Socket socket ) throws IOException {
@@ -40,7 +40,8 @@ public class DataConnection implements AutoCloseable {
 
 	@Override
 	public void close() throws IOException {
-		DataConnectionManager.getInstance().remove( mOperation.getSerialNo() );
+		DataConnectionManager.getInstance()
+			.remove( mOperation.getFileInfo().getId() );
 		
 		if( mMessager != null && !mMessager.isClosed() ) {
 			mMessager.close();
@@ -74,7 +75,9 @@ public class DataConnection implements AutoCloseable {
 	
 	public long sendRequestOperation(FileTransferInfo fi) throws IOException {
 		mOperation = new ReadFileOperation(fi);
-		DataConnectionManager.getInstance().add( mOperation.getSerialNo(), this );
+		DataConnectionManager.getInstance()
+			.add( mOperation.getFileInfo().getId(), this );
+		
 		return mMessager.sendOperation( mOperation );
 	}
 
@@ -83,8 +86,16 @@ public class DataConnection implements AutoCloseable {
 					   InterruptedException, ConnectionSyncException,
 					   BadPacketException, TimeoutException {
 		
-		mOperation = mMessager.receiveOperation(true, timeoutInMs);
-		DataConnectionManager.getInstance().add( mOperation.getSerialNo(), this );
+		DirectOperation op = mMessager.receiveOperation(true, timeoutInMs);
+		if( op.getOpCode() != DirectMessager.OPCODE_TYPE_READ_FILE ) {
+			throw new BadPacketException( 
+					"Only read file operation is accepted for a data connection! "
+					+ "The opcode received is " + op.getOpCode() );
+		}
+		mOperation = (ReadFileOperation) op;
+		DataConnectionManager.getInstance()
+			.add( mOperation.getFileInfo().getId(), this );
+		
 		return mOperation;
 	}
 
