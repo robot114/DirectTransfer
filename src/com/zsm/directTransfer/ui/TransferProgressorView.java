@@ -79,7 +79,7 @@ public class TransferProgressorView extends LinearLayout {
 		final StringBuilder builder = new StringBuilder();
 		builder.append( mContext.getString( string.transferProgressLeftTime ) );
 		if( leftTimeMs >= 0 ) {
-			TextUtil.appendDurationText( builder, leftTimeMs*1000 );
+			TextUtil.appendDurationText( builder, leftTimeMs );
 		} else {
 			builder.append( '~' );
 		}

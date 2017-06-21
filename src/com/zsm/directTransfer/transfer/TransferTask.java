@@ -1,7 +1,7 @@
 package com.zsm.directTransfer.transfer;
 
 import com.zsm.directTransfer.connection.DataConnection;
-import com.zsm.directTransfer.transfer.operation.DirectFileOperation.FileTransferInfo;
+import com.zsm.directTransfer.transfer.operation.FileTransferInfo;
 import com.zsm.directTransfer.transfer.operation.FileTransferActionOperation;
 
 public abstract class TransferTask {
@@ -15,7 +15,7 @@ public abstract class TransferTask {
 	protected FileTransferInfo mFileTraqnsferInfo;
 	protected TransferProgressor mProgressor;
 	protected DataConnection mConnection;
-	private STATE mTaskState;
+	private STATE mTaskState = STATE.INIT;
 	private STATE mAdminState = STATE.NORMAL;
 	protected final Object mLock = new Object();
 	
@@ -33,6 +33,10 @@ public abstract class TransferTask {
 			} else {
 				mAdminState = state;
 			}
+			// Progressor's state should be updated by the REAL state of the task
+			if( mProgressor != null ) {
+				mProgressor.updateState( getState() );
+			}
 		}
 	}
 
@@ -48,34 +52,34 @@ public abstract class TransferTask {
 
 	public void resumeByPeer() {
 		setState( STATE.NORMAL );
-		mProgressor.updateState( getState() );
 	}
 
 	public void pauseByPeer() {
 		setState( STATE.PAUSED );
-		mProgressor.updateState( getState() );
 	}
 
 	public void cancelByPeer() {
 		setState( STATE.CANCELLED );
-		mProgressor.updateState( getState() );
 	}
 
 	public void resumeByUi() {
 		mConnection.notifyPeerOperation( 
-			FileTransferActionOperation.VALUE_ACTION_CONTINUE );
+				mFileTraqnsferInfo.getId(),
+				FileTransferActionOperation.VALUE_ACTION_CONTINUE );
 		setState( STATE.NORMAL );
 	}
 
 	public void pauseByUi() {
 		mConnection.notifyPeerOperation(
-			FileTransferActionOperation.VALUE_ACTION_PAUSE );
+				mFileTraqnsferInfo.getId(),
+				FileTransferActionOperation.VALUE_ACTION_PAUSE );
 		setState( STATE.PAUSED );
 	}
 
 	public void cancelByUi() {
 		mConnection.notifyPeerOperation(
-			FileTransferActionOperation.VALUE_ACTION_CANCEL );
+				mFileTraqnsferInfo.getId(),
+				FileTransferActionOperation.VALUE_ACTION_CANCEL );
 		setState( STATE.CANCELLED );
 	}
 	

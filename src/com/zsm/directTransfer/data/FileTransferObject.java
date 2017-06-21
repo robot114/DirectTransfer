@@ -1,7 +1,7 @@
 package com.zsm.directTransfer.data;
 
 import com.zsm.directTransfer.transfer.TransferProgressor;
-import com.zsm.directTransfer.transfer.operation.DirectFileOperation.FileTransferInfo;
+import com.zsm.directTransfer.transfer.operation.FileTransferInfo;
 
 public class FileTransferObject {
 	

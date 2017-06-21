@@ -11,12 +11,13 @@ import com.zsm.directTransfer.data.WifiP2pPeer;
 import com.zsm.directTransfer.transfer.TransferTask;
 import com.zsm.directTransfer.transfer.operation.BadPacketException;
 import com.zsm.directTransfer.transfer.operation.ConnectionSyncException;
-import com.zsm.directTransfer.transfer.operation.DirectFileOperation.FileTransferInfo;
+import com.zsm.directTransfer.transfer.operation.FileTransferInfo;
 import com.zsm.directTransfer.transfer.operation.DirectMessager;
 import com.zsm.directTransfer.transfer.operation.DirectOperation;
 import com.zsm.directTransfer.transfer.operation.FileTransferActionOperation;
 import com.zsm.directTransfer.transfer.operation.ReadFileOperation;
 import com.zsm.directTransfer.wifip2p.WifiP2pGroupManager;
+import com.zsm.log.Log;
 
 public class DataConnection implements AutoCloseable {
 	
@@ -75,6 +76,7 @@ public class DataConnection implements AutoCloseable {
 	
 	public long sendRequestOperation(FileTransferInfo fi) throws IOException {
 		mOperation = new ReadFileOperation(fi);
+		Log.d( "Request of the operation is to be sent. ", mOperation );
 		DataConnectionManager.getInstance()
 			.add( mOperation.getFileInfo().getId(), this );
 		
@@ -139,12 +141,12 @@ public class DataConnection implements AutoCloseable {
 		}
 	}
 
-	public void notifyPeerOperation(byte operation) {
+	public void notifyPeerOperation(long transferId, byte operation) {
 		PeerMessageConnection mc
 			= MessageConnectionManager.getInstance()
 				.getPeerMessageConnection( mSocket.getInetAddress() );
 		
-		mc.sendOperation( new FileTransferActionOperation( operation ) );
+		mc.sendOperation( new FileTransferActionOperation( transferId, operation ) );
 	}
 
 	public void setTransferTask(TransferTask task) {

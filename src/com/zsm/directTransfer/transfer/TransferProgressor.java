@@ -1,7 +1,7 @@
 package com.zsm.directTransfer.transfer;
 
 import com.zsm.directTransfer.transfer.TransferTask.STATE;
-import com.zsm.directTransfer.transfer.operation.DirectFileOperation.FileTransferInfo;
+import com.zsm.directTransfer.transfer.operation.FileTransferInfo;
 
 public interface TransferProgressor {
 	

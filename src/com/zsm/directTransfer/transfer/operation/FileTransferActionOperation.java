@@ -3,12 +3,11 @@ package com.zsm.directTransfer.transfer.operation;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
-import com.zsm.directTransfer.connection.DataConnection;
-import com.zsm.directTransfer.connection.DataConnectionManager;
 import com.zsm.directTransfer.connection.PeerMessageConnection;
 import com.zsm.directTransfer.data.WifiP2pPeer;
 import com.zsm.directTransfer.transfer.TransferProgressor;
 import com.zsm.directTransfer.transfer.TransferProgressorManager;
+import com.zsm.log.Log;
 
 public class FileTransferActionOperation extends DirectOperation {
 	// +---------------------------------------------------------------------------------------------+
@@ -23,16 +22,17 @@ public class FileTransferActionOperation extends DirectOperation {
 	
 	private static final byte TYPE_TRANSFER_ID = 1;
 
-	private byte mOperation = VALUE_ACTION_CONTINUE;
+	private byte mAction = VALUE_ACTION_CONTINUE;
 	private long mTransferId;
 	
 	protected FileTransferActionOperation() {
 		super(DirectMessager.OPCODE_TYPE_FILE_OPERATION);
 	}
 	
-	public FileTransferActionOperation( byte operation ) {
+	public FileTransferActionOperation( long transferId, byte operation ) {
 		this();
-		mOperation = operation;
+		mTransferId = transferId;
+		mAction = operation;
 	}
 
 	@Override
@@ -41,8 +41,8 @@ public class FileTransferActionOperation extends DirectOperation {
 		
 		switch( type ) {
 			case TYPE_TRANSFER_ACTION:
-				mOperation = data[0];
-				checkOperation( mOperation );
+				mAction = data[0];
+				checkOperation( mAction );
 				break;
 			case TYPE_TRANSFER_ID:
 				mTransferId = bytesToLong( data, 0 );
@@ -67,11 +67,13 @@ public class FileTransferActionOperation extends DirectOperation {
 		TransferProgressor tp
 			= TransferProgressorManager.getInstance()
 				.getByTransferId(mTransferId);
+		
+		Log.d( "Find transferProgressor by id. ", "TansferId", mTransferId, tp );
 		if( tp == null ) {
 			return new StatusOperation( 
 							StatusOperation.VALUE_STATUS_NO_SUCH_FILE_OPERATION );
 		}
-		switch( mOperation ) {
+		switch( mAction ) {
 			case VALUE_ACTION_CONTINUE:
 				tp.resumeTransferByPeer();
 				break;
@@ -83,24 +85,52 @@ public class FileTransferActionOperation extends DirectOperation {
 				break;
 			default:
 				throw new UnsupportedOperationException(
-							"Unsupport file transfer operation: " + mOperation );
+							"Unsupport file transfer operation: " + mAction );
 		}
 		return StatusOperation.STATUS_OK;
 	}
 
 	@Override
 	int calcTotalArgumentsLength() throws IOException {
-		return DirectMessager.LENGTH_OPCODE + 1 + LEN_ACTION
-			   + DirectMessager.LENGTH_OPCODE + 1 + DirectMessager.LENGTH_SERIAL_NO;
+		return DirectMessager.ARG_TYPE_LENGTH  + DirectMessager.ARG_LENGTH_LENGTH
+				+ LEN_ACTION + DirectMessager.ARG_TYPE_LENGTH
+				+ DirectMessager.ARG_LENGTH_LENGTH + DirectMessager.LENGTH_SERIAL_NO;
 	}
 
 	@Override
 	void outputOperation(DataOutputStream out) throws IOException {
 		out.writeByte( TYPE_TRANSFER_ACTION );
 		out.writeShort( LEN_ACTION );
-		out.writeByte( mOperation );
+		out.writeByte( mAction );
 		out.writeByte( TYPE_TRANSFER_ID );
 		out.writeShort( DirectMessager.LENGTH_SERIAL_NO );
 		out.writeLong( mTransferId );
+	}
+
+	@Override
+	public String toString() {
+		StringBuilder builder = new StringBuilder();
+		builder.append( "TransferId: " )
+			   .append( mTransferId )
+			   .append( ", Action: " );
+		switch( mAction ) {
+			case VALUE_ACTION_CONTINUE:
+				builder.append( "Continue" );
+				break;
+			case VALUE_ACTION_PAUSE:
+				builder.append( "Pause" );
+				break;
+			case VALUE_ACTION_CANCEL:
+				builder.append( "Cancel" );
+				break;
+			default:
+				builder.append( "Unknown" );
+				break;
+		}
+		builder.append( "(" )
+			   .append( mAction )
+			   .append( ")" );
+		
+		return builder.toString();
 	}
 }

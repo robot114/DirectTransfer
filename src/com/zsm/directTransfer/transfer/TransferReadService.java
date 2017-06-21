@@ -18,6 +18,7 @@ import android.app.Activity;
 import android.content.ContentResolver;
 import android.database.Cursor;
 import android.net.Uri;
+import android.os.Looper;
 import android.provider.DocumentsContract;
 import android.widget.Toast;
 
@@ -27,7 +28,7 @@ import com.zsm.directTransfer.connection.DataConnectionManager;
 import com.zsm.directTransfer.data.FileTransferObject;
 import com.zsm.directTransfer.preferences.Preferences;
 import com.zsm.directTransfer.transfer.TransferProgressor.REASON;
-import com.zsm.directTransfer.transfer.operation.DirectFileOperation.FileTransferInfo;
+import com.zsm.directTransfer.transfer.operation.FileTransferInfo;
 import com.zsm.log.Log;
 
 public class TransferReadService implements Runnable, AutoCloseable {
@@ -119,7 +120,7 @@ public class TransferReadService implements Runnable, AutoCloseable {
 	class ReadTask extends TransferTask implements Runnable, Closeable {
 
 		private Semaphore mGrantSemaphore = new Semaphore( 0 );
-		private boolean mGranted = false;
+		private volatile boolean mGranted = false;
 		
 		private OutputStream mOutputStream;
 		
@@ -132,6 +133,7 @@ public class TransferReadService implements Runnable, AutoCloseable {
 		
 		@Override
 		public void run() {
+			Looper.prepare();
 			PermissionsManager.getInstance().requestPermissionsIfNecessaryForResult( 
 				mActivity,
 				new String[]{ Manifest.permission.WRITE_EXTERNAL_STORAGE },
@@ -142,6 +144,9 @@ public class TransferReadService implements Runnable, AutoCloseable {
 						// So only the result is recorded, and the resume the read task
 						mGranted = true;
 						mGrantSemaphore.release();
+						Log.d( "Permission of writing external storage is granted. "
+								+ "Read process starts: ",
+							   mFileTraqnsferInfo.mFileName );
 					}
 
 					@Override
@@ -154,16 +159,15 @@ public class TransferReadService implements Runnable, AutoCloseable {
 						mGranted = false;
 						mGrantSemaphore.release();
 					}
-					
 				});
 			
-			if( mGranted ) {
-				try {
-					mGrantSemaphore.acquire();
+			try {
+				mGrantSemaphore.acquire();
+				if( mGranted ) {
 					readForGrant();
-				} catch (InterruptedException e) {
-					Log.e( e, "GrantSemaphore is interrupted!" );
 				}
+			} catch (InterruptedException e) {
+				Log.e( e, "GrantSemaphore is interrupted!" );
 			}
 		}
 
@@ -196,6 +200,7 @@ public class TransferReadService implements Runnable, AutoCloseable {
 
 		private void read() throws IOException, InterruptedException {
 			mOutputStream = openOutputStream();
+			Log.d( "OutputStream opened for ", mFileTraqnsferInfo );
 			mConnection
 				= DataConnectionManager.getInstance()
 					.connectToServer( mFileTraqnsferInfo.getPeer() );
@@ -236,34 +241,36 @@ public class TransferReadService implements Runnable, AutoCloseable {
 			Cursor c = cr.query(fileUri, DOCUMENT_COLUMNS, null, null, null);
 			OutputStream os;
 			if( c != null && c.moveToFirst() ) {
-				boolean append = Preferences.getInstance().isAppend();
-				long size
-					= c.getLong( c.getColumnIndex( 
-									DocumentsContract.Document.COLUMN_SIZE ) );
-				
-				mFileTraqnsferInfo.setStartPosition( size );
-				String mode = append ? "wa" : "w";
-				os = cr.openOutputStream(fileUri, mode );
-				
-				Log.d( "File exists and get its OutputStream.",
-					   "uri", fileUri, "append", append, "size", size );
-			} else {
-				Uri writeTreeUri = Preferences.getInstance().getWriteUri();
-				Uri dirUri
-					= DocumentsContract.buildDocumentUriUsingTree(
-							writeTreeUri,
-							DocumentsContract.getTreeDocumentId(writeTreeUri));
-				
-				Uri newFileUri
-					= DocumentsContract.createDocument(
-						cr, dirUri,
-						"application/octet-stream", getFileName() );
-				if( newFileUri == null ) {
-					throw new FileNotFoundException( "Create the file failed: " + fileUri );
+				if( Preferences.getInstance().isAppend() ) {
+					long size
+						= c.getLong( c.getColumnIndex( 
+										DocumentsContract.Document.COLUMN_SIZE ) );
+					
+					mFileTraqnsferInfo.setStartPosition( size );
+					os = cr.openOutputStream(fileUri, "wa" );
+					
+					Log.d( "File exists and get its appended OutputStream. ",
+						   "uri", fileUri, "size", size );
+					return os;
+				} else {
+					DocumentsContract.deleteDocument(cr, fileUri);
 				}
-				os = cr.openOutputStream(newFileUri );
-				Log.d( "New file created", newFileUri );
+			} 
+			Uri writeTreeUri = Preferences.getInstance().getWriteUri();
+			Uri dirUri
+				= DocumentsContract.buildDocumentUriUsingTree(
+						writeTreeUri,
+						DocumentsContract.getTreeDocumentId(writeTreeUri));
+			
+			Uri newFileUri
+				= DocumentsContract.createDocument(
+					cr, dirUri,
+					"application/octet-stream", getFileName() );
+			if( newFileUri == null ) {
+				throw new FileNotFoundException( "Create the file failed: " + fileUri );
 			}
+			os = cr.openOutputStream(newFileUri );
+			Log.d( "New file created", newFileUri );
 			return os;
 		}
 
@@ -323,24 +330,6 @@ public class TransferReadService implements Runnable, AutoCloseable {
 			mConnection = null;
 			
 			mGrantSemaphore.release();
-		}
-
-		@Override
-		public void resumeByPeer() {
-			// TODO Auto-generated method stub
-			
-		}
-
-		@Override
-		public void pauseByPeer() {
-			// TODO Auto-generated method stub
-			
-		}
-
-		@Override
-		public void cancelByPeer() {
-			// TODO Auto-generated method stub
-			
 		}
 	}
 }

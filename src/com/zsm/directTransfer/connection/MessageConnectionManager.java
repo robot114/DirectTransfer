@@ -6,6 +6,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeoutException;
 
 import android.content.Context;
 
@@ -16,7 +17,6 @@ import com.zsm.log.Log;
 public class MessageConnectionManager implements AutoCloseable {
 
 	private static final int MESSAGE_PORT = 8888;
-	private static final int BIND_REQUEST_TIMEOUT = 3000;
 	
 	private static MessageConnectionManager mInstance;
 	
@@ -75,7 +75,7 @@ public class MessageConnectionManager implements AutoCloseable {
 				do {
 					try {
 						acceptMessageConnection();
-					} catch (IOException e) {
+					} catch (IOException | TimeoutException e) {
 						Log.e( e, "Cannot start client socket" );
 						// TODO ResId
 						mStatusBar
@@ -118,11 +118,11 @@ public class MessageConnectionManager implements AutoCloseable {
 							mMessageConnectionListener );
 				
 			    try {
-			    	peerConnection.connect(BIND_REQUEST_TIMEOUT);
+			    	peerConnection.connect();
 			    	Log.d( "Message connection connected", peerConnection );
 					mPeerMessageConnectionSet.put(peerAddress, peerConnection);
 					mMessageConnectionListener.connected( peerConnection );
-				} catch (IOException e) {
+				} catch (IOException | TimeoutException e) {
 					Log.e( e, "Cannot request connection to the peer", peerAddress );
 					peerConnection.close();
 				}
@@ -130,7 +130,9 @@ public class MessageConnectionManager implements AutoCloseable {
 		}.start();
 	}
 
-	private PeerMessageConnection acceptMessageConnection() throws IOException {
+	private PeerMessageConnection acceptMessageConnection()
+					throws IOException, TimeoutException {
+		
 		Socket client;
 		client = mServerSocket.accept();
 		Log.d( "Connection from client connected", client );

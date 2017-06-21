@@ -20,7 +20,7 @@ import com.zsm.directTransfer.data.FileTransferObject;
 import com.zsm.directTransfer.transfer.TransferProgressor;
 import com.zsm.directTransfer.transfer.TransferProgressor.OPERATION;
 import com.zsm.directTransfer.transfer.TransferProgressorManager;
-import com.zsm.directTransfer.transfer.operation.DirectFileOperation.FileTransferInfo;
+import com.zsm.directTransfer.transfer.operation.FileTransferInfo;
 import com.zsm.log.Log;
 
 public class TransferFragment extends Fragment implements TransferProgressor.Factory {

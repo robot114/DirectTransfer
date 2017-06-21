@@ -2,6 +2,7 @@ package com.zsm.directTransfer.transfer.operation;
 
 import com.zsm.directTransfer.connection.PeerMessageConnection;
 import com.zsm.directTransfer.data.WifiP2pPeer;
+import com.zsm.directTransfer.transfer.operation.FileTransferInfo;
 
 public class ReadFileOperation extends DirectFileOperation {
 
@@ -31,6 +32,12 @@ public class ReadFileOperation extends DirectFileOperation {
 	}
 
 	@Override
+	protected long getOutputSizeOrStart( FileTransferInfo fi ) {
+		// Reader only knows where to start, does not know how large is the file
+		return fi.getStartPosition();
+	}
+
+	@Override
 	public void addArgument(byte type, int dataLen, byte[] data, WifiP2pPeer peer )
 					throws UnsupportedOperationException, BadPacketException {
 		if( mFileList.size() >= 1 ) {
@@ -38,6 +45,14 @@ public class ReadFileOperation extends DirectFileOperation {
 						"Only one file is allowed in a read operation" );
 		}
 		super.addArgument(type, dataLen, data, peer);
+	}
+
+	@Override
+	protected FileTransferInfo buildFileTransferInfo( long transferId,
+									String fileName, long sizeOrStart,
+									WifiP2pPeer peer) {
+		// Reader only knows where to start, does not know how large is the file
+		return new FileTransferInfo( transferId, fileName, 0, sizeOrStart, peer );
 	}
 
 	@Override

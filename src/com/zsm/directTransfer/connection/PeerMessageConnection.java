@@ -10,6 +10,7 @@ import java.net.Socket;
 import java.util.concurrent.TimeoutException;
 
 import com.zsm.directTransfer.data.WifiP2pPeer;
+import com.zsm.directTransfer.preferences.Preferences;
 import com.zsm.directTransfer.transfer.operation.BadPacketException;
 import com.zsm.directTransfer.transfer.operation.ConnectionSyncException;
 import com.zsm.directTransfer.transfer.operation.DirectMessager;
@@ -19,6 +20,8 @@ import com.zsm.directTransfer.wifip2p.WifiP2pGroupManager;
 import com.zsm.log.Log;
 
 public class PeerMessageConnection implements Closeable {
+
+//	private static final int TIMEOUT_FOR_ANNOUNCE_PEER = 3000;
 
 	private enum STATE { 
 		INIT,
@@ -55,7 +58,7 @@ public class PeerMessageConnection implements Closeable {
 
 	public PeerMessageConnection( Socket socket,
 								  MessageConnectionListener listener )
-					throws IOException {
+					throws IOException, TimeoutException {
 		
 		mSocket = socket;
 		mFromSocket = true;
@@ -63,7 +66,9 @@ public class PeerMessageConnection implements Closeable {
 		mPort = mSocket.getPort();
 		mConnectionListener = listener;
 		
-		start( );
+		mConnectionTimeout = Preferences.getInstance().getConnectionTimeout();
+		
+		start();
 	}
 	
 	public PeerMessageConnection( InetAddress peerAddress, int port,
@@ -73,17 +78,19 @@ public class PeerMessageConnection implements Closeable {
 		mPort = port;
 		mFromSocket = false;
 		mConnectionListener = listener;
+		
+		mConnectionTimeout = Preferences.getInstance().getConnectionTimeout();
 	}
 	
-	public void connect( int timeout ) throws IOException {
+	public void connect( ) throws IOException, TimeoutException {
 		if( mFromSocket ) {
 			throw new IllegalStateException( 
 						"Cannot connect a peer constructed from socket" );
 		}
-		connectInner(timeout, CONNECT_RETRIES);
+		connectInner(CONNECT_RETRIES);
 	}
 
-	public void reconnect( int timeout ) throws IOException {
+	public void reconnect( ) throws IOException, TimeoutException {
 		if( mFromSocket ) {
 			// Constructed with socket means the peer request the connection.
 			// So when reconnecting, just do nothing, and wait for the peer's request.
@@ -92,17 +99,12 @@ public class PeerMessageConnection implements Closeable {
 		}
 		
 		close();
-		connectInner(timeout, 1);
+		connectInner(1);
 	}
 
-	public void reconnect( ) throws IOException {
-		reconnect( mConnectionTimeout );
-	}
-
-	synchronized private void connectInner(int timeout, int retries)
-					throws IOException {
+	synchronized private void connectInner(int retries)
+					throws IOException, TimeoutException {
 		
-		mConnectionTimeout = timeout;
 	    InetSocketAddress socketAddress
     		= new InetSocketAddress(mPeerAddress, mPort);
 	    
@@ -116,7 +118,7 @@ public class PeerMessageConnection implements Closeable {
 			mSocket = new Socket( );
     		mSocket.bind(null);
 	    	try {
-				mSocket.connect(socketAddress, timeout);
+				mSocket.connect(socketAddress, mConnectionTimeout);
 				break;
 			} catch (IOException e) {
 				if( i == retries - 1 ) {
@@ -134,10 +136,10 @@ public class PeerMessageConnection implements Closeable {
 			}
 	    }
 	    
-	    start();
+	    start( );
 	}
 	
-	private void start( ) throws IOException {
+	private void start( ) throws IOException, TimeoutException {
 		if( mMessager != null ) {
 			throw new IllegalStateException( 
 						"There already has been a messager: " + mMessager );
@@ -145,7 +147,7 @@ public class PeerMessageConnection implements Closeable {
 		
 		WifiP2pPeer peer
 			= WifiP2pGroupManager.getInstance()
-				.findPeerByAddress(mSocket.getInetAddress());
+				.findPeerByAddress(mSocket.getInetAddress(), mConnectionTimeout );
 	
 		InputStream in = mSocket.getInputStream();
 		OutputStream out = mSocket.getOutputStream();
@@ -177,7 +179,7 @@ public class PeerMessageConnection implements Closeable {
 		mMessageThread = null;
 	}
 
-	public void reconnect( Socket socket ) throws IOException {
+	public void reconnect( Socket socket ) throws IOException, TimeoutException {
 		if( !mFromSocket ) {
 			throw new IllegalStateException( 
 				"Only can reconnect with a socket when it is constructed "
@@ -218,10 +220,6 @@ public class PeerMessageConnection implements Closeable {
 		return mPeerAddress;
 	}
 
-//	public TransferProgressor newProgressor(FileTransferInfo fti) {
-//		return mTransferProgressorFactory.newProgressor( fti );
-//	}
-	
 	@Override
 	public int hashCode() {
 		return mPeerAddress.hashCode() ^ mPort;
@@ -294,15 +292,13 @@ public class PeerMessageConnection implements Closeable {
 					}
 					sleep( 100 );
 				} catch ( ConnectionSyncException | InterruptedException
-						  | IOException | TimeoutException e) {
+						  | IOException | TimeoutException | BadPacketException e) {
 					
-					mClosed = true;
+					close();
 				
 					Log.e(e, "The connection will be reset!" );
 					mConnectionListener
 						.onConnectionFatalError( PeerMessageConnection.this, e );
-				} catch ( UnsupportedOperationException | BadPacketException e ) {
-					// Ignore this operation to continue for the next one
 				}
 			}
 		}
@@ -319,9 +315,9 @@ public class PeerMessageConnection implements Closeable {
 		}
 
 		public StatusOperation waitForResponse(int timeoutInMs)
-						throws UnsupportedOperationException, IOException,
-							   InterruptedException, ConnectionSyncException,
-							   BadPacketException, TimeoutException {
+						throws IOException, InterruptedException,
+							   ConnectionSyncException, BadPacketException,
+							   TimeoutException {
 			
 			mState = STATE.RESPONSE_RECEIVING;
 			DirectOperation op = mMessager.receiveOperation( true, timeoutInMs );

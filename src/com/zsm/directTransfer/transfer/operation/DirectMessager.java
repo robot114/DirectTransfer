@@ -49,7 +49,7 @@ public class DirectMessager implements Closeable {
 	
 	static final Class<?>[] OPCODE_ARRAY 
 		= { StatusOperation.class, WriteFileOperation.class, 
-			ReadFileOperation.class };
+			ReadFileOperation.class, FileTransferActionOperation.class };
 	
 	private Thread mInputThread;
 
@@ -99,7 +99,7 @@ public class DirectMessager implements Closeable {
 	public DirectOperation receiveOperation(boolean blockToWait, int timeoutInMs)
 					throws IOException, InterruptedException, 
 						   ConnectionSyncException, BadPacketException, 
-						   UnsupportedOperationException, TimeoutException {
+						   TimeoutException {
 
 		long timeoutSysTime = timeoutInMs > 0 ? System.currentTimeMillis()
 				+ timeoutInMs : -1;
@@ -157,8 +157,8 @@ public class DirectMessager implements Closeable {
 			return null;
 		} catch (ArrayIndexOutOfBoundsException e) {
 			mInputStream.skip(totalLen);
-			throw new UnsupportedOperationException("Unsupported operation: "
-					+ opCode);
+			return new StatusOperation( StatusOperation.VALUE_STATUS_NOT_SUPPORTED,
+										"Unsupported operation: " + opCode);
 		}
 
 		while (totalLen > 0) {

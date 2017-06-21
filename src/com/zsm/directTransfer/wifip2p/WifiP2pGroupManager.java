@@ -16,6 +16,7 @@ import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.TimeoutException;
 
 import android.net.wifi.p2p.WifiP2pDevice;
 import android.net.wifi.p2p.WifiP2pGroup;
@@ -391,7 +392,8 @@ public class WifiP2pGroupManager implements Closeable, AutoCloseable {
 				mSendSocket.send(packet);
 				Log.d( "Send notify packet successfully.", "packet len",
 					   packet.getLength() );
-				break;
+				Thread.sleep( 500 );
+//				break;
 			} catch (IOException e) {
 				Log.w( e, "Request members sent from client failed.",
 					   "reties left", retries );
@@ -481,6 +483,23 @@ public class WifiP2pGroupManager implements Closeable, AutoCloseable {
 			}
 		}
 		
+		Log.w( "Cannot find peer by address: ", address );
 		return null;
+	}
+
+	public WifiP2pPeer findPeerByAddress( InetAddress address, long timeoutInMs )
+							throws TimeoutException {
+		
+		long timeout = System.currentTimeMillis() + timeoutInMs;
+		WifiP2pPeer peer = null;
+		do {
+			if( System.currentTimeMillis() > timeout ) {
+				throw new TimeoutException( "Cannot find peer by address in time: "
+											+ address );
+			}
+			peer = findPeerByAddress(address);
+		} while( peer == null );
+		
+		return peer;
 	}
 }

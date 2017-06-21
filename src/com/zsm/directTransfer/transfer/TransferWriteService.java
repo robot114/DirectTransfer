@@ -93,9 +93,11 @@ public class TransferWriteService implements Runnable, AutoCloseable {
 			unlock();
 		}
 
-		synchronized private void unlock() {
-			if( getState() == STATE.PAUSED ) {
-				mLock.notifyAll();
+		private void unlock() {
+			synchronized( mLock ) {
+				if( getState() == STATE.PAUSED ) {
+					mLock.notifyAll();
+				}
 			}
 		}
 		
@@ -107,19 +109,27 @@ public class TransferWriteService implements Runnable, AutoCloseable {
 			} catch ( FileNotFoundException  e ) {
 				setState( STATE.FAILED );
 				Log.e( e, "File not found", mFileTraqnsferInfo );
-				mProgressor.failed(mFileTraqnsferInfo, REASON.FILE_NOT_FOUND);
+				if( mProgressor != null ) {
+					mProgressor.failed(mFileTraqnsferInfo, REASON.FILE_NOT_FOUND);
+				}
 			} catch (UnsupportedOperationException | ConnectionSyncException
 					 | BadPacketException | IOException e) {
 				setState( STATE.FAILED );
 				Log.e( e, "Invalid packet, reset the data connection" );
-				mProgressor.failed( mFileTraqnsferInfo, REASON.IO_ERROR );
+				if( mProgressor != null ) {
+					mProgressor.failed( mFileTraqnsferInfo, REASON.IO_ERROR );
+				}
 			} catch (InterruptedException e) {
 				Log.d( "Transfer interrupted", mFileTraqnsferInfo );
-				mProgressor.failed( mFileTraqnsferInfo, REASON.CANCELLED );
+				if( mProgressor != null ) {
+					mProgressor.failed( mFileTraqnsferInfo, REASON.CANCELLED );
+				}
 			} catch (TimeoutException e) {
 				setState( STATE.FAILED );
 				Log.e( e, "Transfer timeout" );
-				mProgressor.failed( mFileTraqnsferInfo, REASON.IO_ERROR );
+				if( mProgressor != null ) {
+					mProgressor.failed( mFileTraqnsferInfo, REASON.IO_ERROR );
+				}
 			} finally {
 				if( mFileTraqnsferInfo != null ) {
 					TransferProgressorManager.getInstance()
@@ -147,13 +157,14 @@ public class TransferWriteService implements Runnable, AutoCloseable {
 			}
 			ReadFileOperation rfo = (ReadFileOperation)op;
 			mFileTraqnsferInfo = rfo.getFileInfo();
+			File file = new File( mFileTraqnsferInfo.getFilePathName() );
+			mFileTraqnsferInfo.setSize( file.length() );
 			mProgressor
 				= TransferProgressorManager.getInstance()
 					.getByTransferId( mFileTraqnsferInfo.getId() );
 			
 			mProgressor.setTransferTask( this );
 
-			File file = new File( mFileTraqnsferInfo.getFilePathName() );
 			mProgressor.start(mFileTraqnsferInfo);
 			FileInputStream fis = null;
 			try {
@@ -202,16 +213,16 @@ public class TransferWriteService implements Runnable, AutoCloseable {
 		@Override
 		public void resumeByPeer() {
 			synchronized( mLock ) {
-				super.resumeByPeer();
 				unlock();
+				super.resumeByPeer();
 			}
 		}
 		
 		@Override
 		public void resumeByUi() {
 			synchronized( mLock ) {
+				unlock();
 				super.resumeByUi();
-				mLock.notifyAll();
 			}
 		}
 	}

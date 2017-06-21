@@ -4,7 +4,7 @@ import android.util.LongSparseArray;
 
 import com.zsm.directTransfer.transfer.TransferProgressor.Factory;
 import com.zsm.directTransfer.transfer.TransferProgressor.OPERATION;
-import com.zsm.directTransfer.transfer.operation.DirectFileOperation.FileTransferInfo;
+import com.zsm.directTransfer.transfer.operation.FileTransferInfo;
 import com.zsm.log.Log;
 
 public class TransferProgressorManager {

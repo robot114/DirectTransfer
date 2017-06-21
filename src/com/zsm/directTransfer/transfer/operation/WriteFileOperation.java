@@ -7,6 +7,7 @@ import com.zsm.directTransfer.data.WifiP2pPeer;
 import com.zsm.directTransfer.transfer.TransferProgressor;
 import com.zsm.directTransfer.transfer.TransferProgressorManager;
 import com.zsm.directTransfer.transfer.TransferReadService;
+import com.zsm.directTransfer.transfer.operation.FileTransferInfo;
 import com.zsm.log.Log;
 
 public class WriteFileOperation extends DirectFileOperation{
@@ -57,6 +58,20 @@ public class WriteFileOperation extends DirectFileOperation{
 
 	private WriteFileOperation( boolean outputOneByOne ) {
 		super( DirectMessager.OPCODE_TYPE_WRITE_FILE, outputOneByOne );
+	}
+	
+	@Override
+	protected long getOutputSizeOrStart( FileTransferInfo fi ) {
+		// Writer only knows how large the file is, does not know where to start
+		return fi.getSize();
+	}
+	
+	@Override
+	protected FileTransferInfo buildFileTransferInfo( long transferId,
+									String fileName, long sizeOrStart,
+									WifiP2pPeer peer) {
+		// Writer only knows how large the file is, does not know where to start
+		return new FileTransferInfo( transferId, fileName, sizeOrStart, 0, peer );
 	}
 	
 	@Override

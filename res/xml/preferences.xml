@@ -14,4 +14,11 @@
         android:entries="@array/maxDownloadThread"
         android:defaultValue="3"
         android:persistent="true"/>
+    <CheckBoxPreference
+        android:summaryOn="@string/prefSummary_On_Resume"
+        android:summaryOff="@string/prefSummary_Off_Resume"
+        android:icon="@drawable/resume"
+        android:key="@string/prefKey_Resume"
+        android:title="@string/prefTitle_Resume"
+        android:persistent="true"/>
 </PreferenceScreen>

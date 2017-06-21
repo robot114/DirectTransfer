@@ -22,6 +22,7 @@ public class Preferences {
 	private static final String KEY_USE_SAF = "KEY_USE_SAF";
 	private static final String KEY_READ_PATH = "KEY_READ_PATH";
 	private static String KEY_MAX_TRANSFER_THREAD_NUM;
+	private static String KEY_RESUME;
 	static String KEY_WRITE_PATH;
 
 	private static final String PREFERENCES_BASE_NAME = "DirectTransferPreferences";
@@ -59,6 +60,7 @@ public class Preferences {
 		
 		KEY_WRITE_PATH = c.getString( R.string.prefKey_DownloadTarget );
 		KEY_MAX_TRANSFER_THREAD_NUM = c.getString( R.string.prefKey_MaxTransferThread );
+		KEY_RESUME = c.getString( R.string.prefKey_Resume );
 	}
 	
 	static public Preferences getInstance() {
@@ -179,27 +181,6 @@ public class Preferences {
 			throw new UnsupportedOperationException( "Write path has not picked by SAF!" );
 		}
 		Uri uri = Uri.parse(uriStr);
-//		Uri docUri = DocumentsContract.buildChildDocumentsUriUsingTree(uri, DocumentsContract.getTreeDocumentId(uri));
-//		Cursor cursorRoot
-//			= mContext.getContentResolver().query(docUri, null, null, null, null);
-//		if( cursorRoot != null && cursorRoot.moveToFirst() ) {
-//			String[] columnNames = cursorRoot.getColumnNames();
-//			Log.d( "Columns: ", Arrays.toString( columnNames ) );
-//			Log.d( "Result num: ", cursorRoot.getCount() );
-//			do {
-//				for( int i = 0; i < columnNames.length; i++ ) {
-//					System.out.print( columnNames[i] + "[" );
-//					if( cursorRoot.getType(i) == Cursor.FIELD_TYPE_STRING) {
-//						System.out.print( cursorRoot.getString( i ) + "], ");
-//					} else {
-//						System.out.print( cursorRoot.getInt( i ) + "], ");
-//					}
-//				}
-//				System.out.println();
-//			} while( cursorRoot.moveToNext() );
-//		} else {
-//			Log.d( "Nothing queried!" );
-//		}
 		return uri;
 	}
 
@@ -222,7 +203,11 @@ public class Preferences {
 	}
 	
 	public boolean isAppend() {
-		return preferences.getBoolean( "KEY_APPEND", false );
+		return preferences.getBoolean( KEY_RESUME, false );
+	}
+
+	public int getConnectionTimeout() {
+		return preferences.getInt( "KEY_CONNECT_TIMEOUT", 3000 );
 	}
 
 }

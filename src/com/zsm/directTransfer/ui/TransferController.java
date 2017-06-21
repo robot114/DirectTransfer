@@ -3,7 +3,7 @@ package com.zsm.directTransfer.ui;
 import com.zsm.directTransfer.transfer.TransferProgressor;
 import com.zsm.directTransfer.transfer.TransferTask;
 import com.zsm.directTransfer.transfer.TransferTask.STATE;
-import com.zsm.directTransfer.transfer.operation.DirectFileOperation.FileTransferInfo;
+import com.zsm.directTransfer.transfer.operation.FileTransferInfo;
 
 public class TransferController implements TransferProgressor {
 
@@ -82,7 +82,7 @@ public class TransferController implements TransferProgressor {
 		if( current > 0 ) {
 			leftTimeMs
 				= (long) ((fi.getSize() - current )*( currentTime - mStartTime )
-							/((float)current));
+							/(current-fi.getStartPosition()));
 		}
 		mProgressorView.setProgress(current, fi.getSize(), leftTimeMs );
 	}
@@ -120,9 +120,9 @@ public class TransferController implements TransferProgressor {
 
 	public void startPauseForView() {
 		if( mTransferTask.getState() == STATE.PAUSED ) {
-			mTransferTask.pauseByUi();
-		} else {
 			mTransferTask.resumeByUi();
+		} else {
+			mTransferTask.pauseByUi();
 		}
 	}
 

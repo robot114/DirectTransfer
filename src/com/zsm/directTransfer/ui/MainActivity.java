@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Observable;
 import java.util.Observer;
+import java.util.concurrent.TimeoutException;
 
 import android.app.ActionBar;
 import android.app.Activity;
@@ -366,7 +367,7 @@ public class MainActivity extends Activity implements
 			   connection );
 		try {
 			connection.reconnect( );
-		} catch (IOException e) {
+		} catch (IOException | TimeoutException e) {
 			Log.e( e, "Reconnect failed!", connection );
 		}
 	}

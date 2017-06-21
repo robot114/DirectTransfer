@@ -7,4 +7,9 @@
     <string name="prefKey_MaxTransferThread">KEY_MAX_TRANSFER_THREAD_NUM</string>
     <string name="prefTitle_MaxTransferThread">Max Concurrent Download Thread</string>
     <string name="prefSummary_MaxTransferThread">Max thread number to download at the same time: %s</string>
+
+    <string name="prefKey_Resume">KEY_RESUME</string>
+    <string name="prefTitle_Resume">Resume if existing</string>
+    <string name="prefSummary_On_Resume">Resume if the target exists.</string>
+    <string name="prefSummary_Off_Resume">Over write the target if it exists.</string>
 </resources>
